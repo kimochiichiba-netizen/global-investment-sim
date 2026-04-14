@@ -37,6 +37,16 @@ def init_db():
         )
     """)
 
+    # グローバル戦略専用の口座テーブル（清原式と完全分離）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS global_account (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            cash REAL NOT NULL,
+            initial_capital REAL NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS portfolio (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,6 +69,8 @@ def init_db():
     _add_column_if_not_exists(cur, "portfolio", "buy_per",       "REAL")
     _add_column_if_not_exists(cur, "portfolio", "buy_pbr",       "REAL")
     _add_column_if_not_exists(cur, "portfolio", "buy_nc_ratio",  "REAL")
+    # 2ページ化: 戦略種別（kiyohara / global）
+    _add_column_if_not_exists(cur, "portfolio", "strategy",      "TEXT DEFAULT 'kiyohara'")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS trades (
@@ -76,9 +88,11 @@ def init_db():
             commission_jpy REAL NOT NULL,
             fx_rate REAL NOT NULL,
             reason TEXT,
+            strategy TEXT DEFAULT 'kiyohara',
             executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _add_column_if_not_exists(cur, "trades", "strategy", "TEXT DEFAULT 'kiyohara'")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS asset_history (
@@ -140,7 +154,7 @@ def init_db():
             screened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Lynch / Buffett / MACD 戦略フラグを追加
+    # Lynch / Buffett / MACD 戦略フラグを追加（旧互換）
     _add_column_if_not_exists(cur, "screened_stocks", "lynch_pass",   "INTEGER DEFAULT 0")
     _add_column_if_not_exists(cur, "screened_stocks", "buffett_pass", "INTEGER DEFAULT 0")
     _add_column_if_not_exists(cur, "screened_stocks", "macd_bullish", "INTEGER DEFAULT 0")
@@ -148,6 +162,11 @@ def init_db():
     _add_column_if_not_exists(cur, "screened_stocks", "bb_width",     "REAL")
     _add_column_if_not_exists(cur, "screened_stocks", "roe",          "REAL")
     _add_column_if_not_exists(cur, "screened_stocks", "peg_ratio",    "REAL")
+    # 清原式追加フィールド
+    _add_column_if_not_exists(cur, "screened_stocks", "catalyst_flag",          "INTEGER DEFAULT 0")
+    _add_column_if_not_exists(cur, "screened_stocks", "dividend_payout_ratio",  "REAL")
+    # 2ページ化: 戦略種別
+    _add_column_if_not_exists(cur, "screened_stocks", "strategy",               "TEXT DEFAULT 'kiyohara'")
 
     cur.execute("SELECT id FROM account WHERE id = 1")
     if not cur.fetchone():
@@ -155,7 +174,15 @@ def init_db():
             "INSERT INTO account (id, cash, initial_capital) VALUES (1, ?, ?)",
             (INITIAL_CAPITAL, INITIAL_CAPITAL)
         )
-        print(f"✅ 初期資金 {INITIAL_CAPITAL:,}円 でアカウントを作成しました")
+        print(f"✅ 初期資金 {INITIAL_CAPITAL:,}円 でアカウントを作成しました（清原式）")
+
+    cur.execute("SELECT id FROM global_account WHERE id = 1")
+    if not cur.fetchone():
+        cur.execute(
+            "INSERT INTO global_account (id, cash, initial_capital) VALUES (1, ?, ?)",
+            (INITIAL_CAPITAL, INITIAL_CAPITAL)
+        )
+        print(f"✅ 初期資金 {INITIAL_CAPITAL:,}円 でアカウントを作成しました（グローバル）")
 
     conn.commit()
     conn.close()
@@ -164,17 +191,19 @@ def init_db():
 
 # ==================== account ====================
 
-def get_account() -> Dict:
+def get_account(strategy: str = 'kiyohara') -> Dict:
     conn = get_conn()
-    row  = conn.execute("SELECT * FROM account WHERE id = 1").fetchone()
+    table = 'global_account' if strategy == 'global' else 'account'
+    row  = conn.execute(f"SELECT * FROM {table} WHERE id = 1").fetchone()
     conn.close()
     return dict(row)
 
 
-def update_cash(new_cash: float):
+def update_cash(new_cash: float, strategy: str = 'kiyohara'):
     conn = get_conn()
+    table = 'global_account' if strategy == 'global' else 'account'
     conn.execute(
-        "UPDATE account SET cash = ?, updated_at = ? WHERE id = 1",
+        f"UPDATE {table} SET cash = ?, updated_at = ? WHERE id = 1",
         (new_cash, datetime.now().isoformat())
     )
     conn.commit()
@@ -183,16 +212,22 @@ def update_cash(new_cash: float):
 
 # ==================== portfolio ====================
 
-def get_portfolio() -> List[Dict]:
+def get_portfolio(strategy: str = 'kiyohara') -> List[Dict]:
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM portfolio ORDER BY market, ticker").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM portfolio WHERE strategy = ? ORDER BY market, ticker",
+        (strategy,)
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_holding(ticker: str) -> Optional[Dict]:
+def get_holding(ticker: str, strategy: str = 'kiyohara') -> Optional[Dict]:
     conn = get_conn()
-    row  = conn.execute("SELECT * FROM portfolio WHERE ticker = ?", (ticker,)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM portfolio WHERE ticker = ? AND strategy = ?",
+        (ticker, strategy)
+    ).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -204,13 +239,14 @@ def upsert_holding(ticker: str, name: str, market: str, currency: str, flag: str
                    partial_taken: int = 0,
                    buy_per: Optional[float] = None,
                    buy_pbr: Optional[float] = None,
-                   buy_nc_ratio: Optional[float] = None):
+                   buy_nc_ratio: Optional[float] = None,
+                   strategy: str = 'kiyohara'):
     conn = get_conn()
     conn.execute("""
         INSERT INTO portfolio
             (ticker, name, market, currency, flag, shares, avg_cost_local, avg_cost_jpy,
-             peak_price, trailing_stop, partial_taken, buy_per, buy_pbr, buy_nc_ratio)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             peak_price, trailing_stop, partial_taken, buy_per, buy_pbr, buy_nc_ratio, strategy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(ticker) DO UPDATE SET
             shares = ?,
             avg_cost_local = ?,
@@ -222,42 +258,44 @@ def upsert_holding(ticker: str, name: str, market: str, currency: str, flag: str
             partial_taken = ?,
             buy_per       = COALESCE(?, buy_per),
             buy_pbr       = COALESCE(?, buy_pbr),
-            buy_nc_ratio  = COALESCE(?, buy_nc_ratio)
+            buy_nc_ratio  = COALESCE(?, buy_nc_ratio),
+            strategy      = ?
     """, (
         ticker, name, market, currency, flag, shares, avg_cost_local, avg_cost_jpy,
-        peak_price, trailing_stop, partial_taken, buy_per, buy_pbr, buy_nc_ratio,
+        peak_price, trailing_stop, partial_taken, buy_per, buy_pbr, buy_nc_ratio, strategy,
         # UPDATE部分
         shares, avg_cost_local, avg_cost_jpy, name, flag,
         peak_price, trailing_stop, partial_taken,
-        buy_per, buy_pbr, buy_nc_ratio,
+        buy_per, buy_pbr, buy_nc_ratio, strategy,
     ))
     conn.commit()
     conn.close()
 
 
-def update_trailing_stop(ticker: str, peak_price: float, trailing_stop: float):
+def update_trailing_stop(ticker: str, peak_price: float, trailing_stop: float,
+                          strategy: str = 'kiyohara'):
     conn = get_conn()
     conn.execute(
-        "UPDATE portfolio SET peak_price = ?, trailing_stop = ? WHERE ticker = ?",
-        (peak_price, trailing_stop, ticker)
+        "UPDATE portfolio SET peak_price = ?, trailing_stop = ? WHERE ticker = ? AND strategy = ?",
+        (peak_price, trailing_stop, ticker, strategy)
     )
     conn.commit()
     conn.close()
 
 
-def mark_partial_taken(ticker: str):
+def mark_partial_taken(ticker: str, strategy: str = 'kiyohara'):
     conn = get_conn()
     conn.execute(
-        "UPDATE portfolio SET partial_taken = 1 WHERE ticker = ?",
-        (ticker,)
+        "UPDATE portfolio SET partial_taken = 1 WHERE ticker = ? AND strategy = ?",
+        (ticker, strategy)
     )
     conn.commit()
     conn.close()
 
 
-def delete_holding(ticker: str):
+def delete_holding(ticker: str, strategy: str = 'kiyohara'):
     conn = get_conn()
-    conn.execute("DELETE FROM portfolio WHERE ticker = ?", (ticker,))
+    conn.execute("DELETE FROM portfolio WHERE ticker = ? AND strategy = ?", (ticker, strategy))
     conn.commit()
     conn.close()
 
@@ -266,49 +304,53 @@ def delete_holding(ticker: str):
 
 def save_trade(ticker: str, name: str, market: str, currency: str, flag: str,
                action: str, shares: float, price_local: float, price_jpy: float,
-               total_jpy: float, commission_jpy: float, fx_rate: float, reason: str):
+               total_jpy: float, commission_jpy: float, fx_rate: float, reason: str,
+               strategy: str = 'kiyohara'):
     conn = get_conn()
     conn.execute("""
         INSERT INTO trades
             (ticker, name, market, currency, flag, action, shares,
-             price_local, price_jpy, total_jpy, commission_jpy, fx_rate, reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             price_local, price_jpy, total_jpy, commission_jpy, fx_rate, reason, strategy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (ticker, name, market, currency, flag, action, shares,
-          price_local, price_jpy, total_jpy, commission_jpy, fx_rate, reason))
+          price_local, price_jpy, total_jpy, commission_jpy, fx_rate, reason, strategy))
     conn.commit()
     conn.close()
 
 
-def get_trades(limit: int = 50) -> List[Dict]:
+def get_trades(limit: int = 50, strategy: str = 'kiyohara') -> List[Dict]:
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM trades ORDER BY executed_at DESC LIMIT ?", (limit,)
+        "SELECT * FROM trades WHERE strategy = ? ORDER BY executed_at DESC LIMIT ?",
+        (strategy, limit)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def recently_sold(ticker: str, days: int = 3) -> bool:
+def recently_sold(ticker: str, days: int = 3, strategy: str = 'kiyohara') -> bool:
     """直近N日以内に売却したか確認（売買コスト節約）"""
     conn = get_conn()
     row = conn.execute("""
         SELECT id FROM trades
-        WHERE ticker = ? AND action IN ('sell', '損切り', '利確', '部分利確')
+        WHERE ticker = ? AND strategy = ?
+        AND action IN ('sell', '損切り', '利確', '部分利確')
         AND executed_at >= datetime('now', ?)
         ORDER BY executed_at DESC LIMIT 1
-    """, (ticker, f"-{days} days")).fetchone()
+    """, (ticker, strategy, f"-{days} days")).fetchone()
     conn.close()
     return row is not None
 
 
-def get_last_sell_action(ticker: str) -> Optional[Dict]:
+def get_last_sell_action(ticker: str, strategy: str = 'kiyohara') -> Optional[Dict]:
     """直近の売却情報（action と executed_at）を返す。なければ None"""
     conn = get_conn()
     row = conn.execute("""
         SELECT action, executed_at FROM trades
-        WHERE ticker = ? AND action IN ('sell', '損切り', '利確', '部分利確')
+        WHERE ticker = ? AND strategy = ?
+        AND action IN ('sell', '損切り', '利確', '部分利確')
         ORDER BY executed_at DESC LIMIT 1
-    """, (ticker,)).fetchone()
+    """, (ticker, strategy)).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -398,11 +440,13 @@ def save_screened_stock(data: Dict):
             (ticker, name, market, currency, flag, market_cap, per, pbr,
              net_cash_ratio, composite_score, minervini_pass, canslim_pass,
              current_price, rsi14, ma50, ma150, ma200,
-             lynch_pass, buffett_pass, macd_bullish, roc20, bb_width, roe, peg_ratio)
+             lynch_pass, buffett_pass, macd_bullish, roc20, bb_width, roe, peg_ratio,
+             catalyst_flag, dividend_payout_ratio)
         VALUES (:ticker, :name, :market, :currency, :flag, :market_cap, :per, :pbr,
                 :net_cash_ratio, :composite_score, :minervini_pass, :canslim_pass,
                 :current_price, :rsi14, :ma50, :ma150, :ma200,
-                :lynch_pass, :buffett_pass, :macd_bullish, :roc20, :bb_width, :roe, :peg_ratio)
+                :lynch_pass, :buffett_pass, :macd_bullish, :roc20, :bb_width, :roe, :peg_ratio,
+                :catalyst_flag, :dividend_payout_ratio)
         ON CONFLICT(ticker) DO UPDATE SET
             composite_score=excluded.composite_score,
             minervini_pass=excluded.minervini_pass,
@@ -419,42 +463,71 @@ def save_screened_stock(data: Dict):
             bb_width=excluded.bb_width,
             roe=excluded.roe,
             peg_ratio=excluded.peg_ratio,
+            catalyst_flag=excluded.catalyst_flag,
+            dividend_payout_ratio=excluded.dividend_payout_ratio,
             screened_at=CURRENT_TIMESTAMP
     """, data)
     conn.commit()
     conn.close()
 
 
-def get_screened_stocks() -> List[Dict]:
+def get_screened_stocks(strategy: str = 'kiyohara') -> List[Dict]:
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM screened_stocks ORDER BY composite_score DESC"
+        "SELECT * FROM screened_stocks WHERE strategy = ? ORDER BY composite_score DESC",
+        (strategy,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def is_screened(ticker: str) -> bool:
+def is_screened(ticker: str, strategy: str = 'kiyohara') -> bool:
     conn = get_conn()
     row = conn.execute(
-        "SELECT ticker FROM screened_stocks WHERE ticker = ?", (ticker,)
+        "SELECT ticker FROM screened_stocks WHERE ticker = ? AND strategy = ?",
+        (ticker, strategy)
     ).fetchone()
     conn.close()
     return row is not None
 
 
-# ==================== reset ====================
-
-def reset_all():
+def clear_screened_stocks_by_strategy(strategy: str):
+    """指定戦略のスクリーニング結果のみ削除"""
     conn = get_conn()
-    conn.execute("DELETE FROM portfolio")
-    conn.execute("DELETE FROM trades")
-    conn.execute("DELETE FROM asset_history")
-    conn.execute("DELETE FROM screened_stocks")
-    conn.execute(
-        "UPDATE account SET cash = ?, updated_at = ? WHERE id = 1",
-        (INITIAL_CAPITAL, datetime.now().isoformat())
-    )
+    conn.execute("DELETE FROM screened_stocks WHERE strategy = ?", (strategy,))
     conn.commit()
     conn.close()
-    print("🔄 データをリセットしました")
+
+
+# ==================== reset ====================
+
+def reset_all(strategy: Optional[str] = None):
+    """strategy 指定なし → 全データリセット。指定あり → その戦略のみリセット"""
+    conn = get_conn()
+    now = datetime.now().isoformat()
+    if strategy:
+        conn.execute("DELETE FROM portfolio WHERE strategy = ?", (strategy,))
+        conn.execute("DELETE FROM trades WHERE strategy = ?", (strategy,))
+        conn.execute("DELETE FROM screened_stocks WHERE strategy = ?", (strategy,))
+        # 戦略専用の口座残高もリセット
+        table = 'global_account' if strategy == 'global' else 'account'
+        conn.execute(
+            f"UPDATE {table} SET cash = ?, updated_at = ? WHERE id = 1",
+            (INITIAL_CAPITAL, now)
+        )
+    else:
+        conn.execute("DELETE FROM portfolio")
+        conn.execute("DELETE FROM trades")
+        conn.execute("DELETE FROM asset_history")
+        conn.execute("DELETE FROM screened_stocks")
+        conn.execute(
+            "UPDATE account SET cash = ?, updated_at = ? WHERE id = 1",
+            (INITIAL_CAPITAL, now)
+        )
+        conn.execute(
+            "UPDATE global_account SET cash = ?, updated_at = ? WHERE id = 1",
+            (INITIAL_CAPITAL, now)
+        )
+    conn.commit()
+    conn.close()
+    print(f"🔄 データをリセットしました（strategy={strategy or 'all'}）")
