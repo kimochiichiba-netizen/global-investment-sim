@@ -424,6 +424,7 @@ def get_fundamental_info(ticker: str, watchlist: Optional[Dict] = None) -> Optio
             "name":                 info_meta["name"],
             "market_cap":           market_cap,
             "market_cap_oku":       market_cap_oku,
+            "market_cap_usd":       market_cap_oku,   # DBカラム名との互換性維持
             "per":                  round(float(per), 2) if per and float(per) > 0 else None,
             "pbr":                  round(float(pbr), 2) if pbr and float(pbr) > 0 else None,
             "current_assets":       current_assets,

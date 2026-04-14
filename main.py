@@ -49,20 +49,26 @@ scheduler = BackgroundScheduler(timezone=JST)
 
 
 def scheduled_trade():
-    """1分ごとに両戦略の自動売買（市場が開いていれば実行）"""
+    """1分ごとに自動売買
+    - 清原式: 東京証券取引所（TSE）が開いている時のみ実行（平日9:00〜15:30）
+    - グローバル: 開いている市場があれば実行
+    """
     open_markets = get_open_markets()
-    if not open_markets:
-        return
-    run_kiyohara_trading(force=False)
-    run_global_trading_orig(force=False)
+
+    # 清原式: TSEが開いている時のみ
+    if "TSE" in open_markets:
+        run_kiyohara_trading(force=False)
+
+    # グローバル: どこかの市場が開いていれば
+    if open_markets:
+        run_global_trading_orig(force=False)
 
 
 def scheduled_screening():
-    """毎朝8時に両スクリーニングを自動実行"""
+    """毎朝8時に清原式スクリーニングを自動実行"""
     print(f"\n⏰ 定期スクリーニング開始: {datetime.now(JST).strftime('%H:%M')}")
-    from screener import run_kiyohara_screening, run_global_screening
+    from screener import run_kiyohara_screening
     run_kiyohara_screening(verbose=False)
-    run_global_screening(verbose=False)
 
 
 scheduler.add_job(
