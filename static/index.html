@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🌍 グローバル投資シミュレーター Pro</title>
+  <title>🌍 グローバル投資シミュレーター</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -12,78 +12,92 @@
     .card2 { background: #111827; border: 1px solid #1f2937; border-radius: 14px; }
     .positive { color: #22c55e; }
     .negative { color: #ef4444; }
-
     .mkt-open   { background:#052e16; border:1px solid #16a34a; color:#4ade80; }
     .mkt-closed { background:#1a1a2e; border:1px solid #334155; color:#64748b; }
-
     .btn-run {
       background: linear-gradient(135deg,#6366f1,#8b5cf6);
       color:#fff; border:none; border-radius:10px;
-      padding:10px 22px; cursor:pointer; font-weight:700;
-      transition:opacity .2s;
+      padding:9px 18px; cursor:pointer; font-weight:700;
+      transition:opacity .2s; font-size:13px;
     }
     .btn-run:hover { opacity:.85; }
     .btn-run:disabled { opacity:.45; cursor:not-allowed; }
     .btn-screen {
       background: linear-gradient(135deg,#0ea5e9,#06b6d4);
       color:#fff; border:none; border-radius:10px;
-      padding:8px 18px; cursor:pointer; font-weight:700;
+      padding:8px 16px; cursor:pointer; font-weight:700;
       transition:opacity .2s; font-size:13px;
     }
     .btn-screen:hover { opacity:.85; }
     .btn-screen:disabled { opacity:.45; cursor:not-allowed; }
+    .btn-notif {
+      background:#1e293b; color:#94a3b8;
+      border:1px solid #334155; border-radius:10px;
+      padding:8px 14px; cursor:pointer; font-weight:600;
+      transition:all .2s; font-size:13px;
+    }
+    .btn-notif.active { background:#14532d20; color:#4ade80; border-color:#16a34a; }
+    .btn-notif:hover { border-color:#4b5563; }
     .btn-reset {
       background:#ef444415; color:#ef4444;
       border:1px solid #ef4444; border-radius:10px;
-      padding:10px 18px; cursor:pointer; font-weight:600;
+      padding:9px 14px; cursor:pointer; font-weight:600; font-size:13px;
     }
     .btn-reset:hover { background:#ef444430; }
-
-    .tab { padding:5px 12px; border-radius:6px; font-size:12px; cursor:pointer;
+    .btn-backtest {
+      background: linear-gradient(135deg,#d97706,#f59e0b);
+      color:#fff; border:none; border-radius:10px;
+      padding:8px 16px; cursor:pointer; font-weight:700;
+      transition:opacity .2s; font-size:13px;
+    }
+    .btn-backtest:hover { opacity:.85; }
+    .btn-backtest:disabled { opacity:.45; cursor:not-allowed; }
+    .tab { padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer;
            border:1px solid #1e3a5f; color:#64748b; background:transparent; }
     .tab.active { background:#6366f1; color:#fff; border-color:#6366f1; }
-
-    .badge-buy    { background:#16a34a20; color:#22c55e; border:1px solid #16a34a; }
-    .badge-sell   { background:#dc262620; color:#ef4444; border:1px solid #dc2626; }
-    .badge-利確   { background:#d9770620; color:#f97316; border:1px solid #d97706; }
+    .market-tab { padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer;
+                  border:1px solid #1e3a5f; color:#64748b; background:transparent; }
+    .market-tab.active { background:#0f2a4a; color:#60a5fa; border-color:#3b82f6; }
+    .badge-buy     { background:#16a34a20; color:#22c55e; border:1px solid #16a34a; }
+    .badge-sell    { background:#dc262620; color:#ef4444; border:1px solid #dc2626; }
+    .badge-利確    { background:#d9770620; color:#f97316; border:1px solid #d97706; }
     .badge-部分利確{ background:#ca8a0420; color:#eab308; border:1px solid #ca8a04; }
-    .badge-損切り { background:#7f1d1d20; color:#fca5a5; border:1px solid #7f1d1d; }
-
-    .spin { width:14px; height:14px; border:2px solid #ffffff30;
+    .badge-損切り  { background:#7f1d1d20; color:#fca5a5; border:1px solid #7f1d1d; }
+    .spin { width:13px; height:13px; border:2px solid #ffffff30;
             border-top-color:#fff; border-radius:50%;
             animation:spin .7s linear infinite; display:inline-block; }
     @keyframes spin { to { transform:rotate(360deg); } }
-
     .glow-green { box-shadow: 0 0 20px #22c55e30; }
     .glow-blue  { box-shadow: 0 0 20px #6366f130; }
     .glow-cyan  { box-shadow: 0 0 20px #06b6d430; }
-
-    /* NC比率バー */
-    .nc-bar { height:6px; border-radius:3px; background:#1e3a5f; overflow:hidden; }
+    .glow-amber { box-shadow: 0 0 20px #f59e0b30; }
+    .nc-bar  { height:5px; border-radius:3px; background:#1e3a5f; overflow:hidden; }
     .nc-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#06b6d4,#6366f1); }
-
+    .sector-bar  { height:6px; border-radius:3px; background:#1e3a5f; overflow:hidden; }
+    .sector-fill { height:100%; border-radius:3px; }
     ::-webkit-scrollbar { width:5px; }
     ::-webkit-scrollbar-track { background:#0f1e35; }
     ::-webkit-scrollbar-thumb { background:#1e3a5f; border-radius:3px; }
+    .collapse-btn { cursor:pointer; user-select:none; }
+    .collapse-content { transition: max-height .3s ease; overflow:hidden; }
   </style>
 </head>
 <body class="min-h-screen p-5">
 
 <!-- ヘッダー -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-5">
   <div class="flex items-center gap-3">
     <span class="text-4xl">🌍</span>
     <div>
       <h1 class="text-2xl font-bold text-white">グローバル投資シミュレーター
-        <span class="text-xs bg-indigo-900 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded-full ml-2">Pro v2</span>
+        <span class="text-xs bg-indigo-900 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded-full ml-2">Pro v3</span>
       </h1>
-      <p class="text-xs text-slate-500">5市場・15銘柄 / 仮想資金200万円 / 清原式+Minervini+CAN-SLIM 複合戦略</p>
+      <p class="text-xs text-slate-500">7市場・50銘柄 / 仮想資金200万円 / 清原式+Minervini+Lynch+Buffett+MACD 複合戦略</p>
     </div>
   </div>
   <div class="flex items-center gap-2">
-    <div id="countdown-badge" class="text-xs text-slate-500 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700">
-      更新: --秒
-    </div>
+    <div id="countdown-badge" class="text-xs text-slate-500 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700">更新: --秒</div>
+    <button id="notif-btn" class="btn-notif" onclick="toggleNotification()">🔔 通知OFF</button>
     <button id="screen-btn" class="btn-screen" onclick="runScreening()">🔍 スクリーニング</button>
     <button id="run-btn" class="btn-run" onclick="runTrade()">⚡ 取引実行</button>
     <button class="btn-reset" onclick="resetData()">🔄 リセット</button>
@@ -91,10 +105,10 @@
 </div>
 
 <!-- 市場ステータス -->
-<div id="market-cards" class="grid grid-cols-5 gap-3 mb-5"></div>
+<div id="market-cards" class="grid grid-cols-7 gap-3 mb-5"></div>
 
 <!-- サマリーカード -->
-<div class="grid grid-cols-6 gap-3 mb-5">
+<div class="grid grid-cols-6 gap-3 mb-4">
   <div class="card p-4 glow-blue col-span-2">
     <div class="text-xs text-slate-400 mb-1">総資産（円換算）</div>
     <div id="total-assets" class="text-2xl font-bold text-white">--</div>
@@ -122,6 +136,41 @@
   </div>
 </div>
 
+<!-- ★ 資産推移グラフ（常時表示・上部に配置） -->
+<div class="card p-5 mb-4 glow-blue">
+  <div class="flex items-center justify-between mb-2">
+    <h2 class="font-bold text-white text-sm">💹 資産推移グラフ（円換算・累計）</h2>
+    <div id="asset-pnl-badge" class="text-xs px-2 py-0.5 rounded-full border"></div>
+  </div>
+  <div class="h-40">
+    <canvas id="asset-chart"></canvas>
+  </div>
+</div>
+
+<!-- ★ セクター分散アラート（集中時のみ表示） -->
+<div id="sector-alert" class="hidden card p-4 mb-4 border-yellow-600" style="border-color:#ca8a04; background:#1c1200;">
+  <div class="flex items-start gap-2">
+    <span class="text-yellow-400 text-lg">⚠️</span>
+    <div class="flex-1">
+      <div class="font-bold text-yellow-300 text-sm mb-2">セクター集中アラート — 1つのセクターに30%超が集中しています</div>
+      <div id="sector-bars" class="space-y-1.5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- セクター内訳（常時折りたたみ可） -->
+<div class="card p-4 mb-4" id="sector-panel">
+  <div class="flex items-center justify-between collapse-btn" onclick="toggleCollapse('sector-detail')">
+    <h2 class="font-bold text-white text-sm">🏭 セクター分散（ポートフォリオ内訳）</h2>
+    <span id="sector-toggle-icon" class="text-slate-400 text-xs">▼ 開く</span>
+  </div>
+  <div id="sector-detail" class="collapse-content" style="max-height:0px;">
+    <div id="sector-content" class="mt-3">
+      <div class="text-slate-500 text-xs text-center py-4">保有株なし</div>
+    </div>
+  </div>
+</div>
+
 <!-- スクリーニング結果 -->
 <div class="card p-5 mb-4 glow-cyan" id="screening-section">
   <div class="flex justify-between items-center mb-3">
@@ -130,18 +179,17 @@
         🔍 投資候補（スクリーニング通過銘柄）
         <span id="screened-badge" class="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full ml-2">0件</span>
       </h2>
-      <p class="text-xs text-slate-500 mt-0.5">← 清原式NC比率 + Minervini(MA50>150>200) + CAN-SLIM出来高 + リバモア高値突破 の複合スコア順</p>
+      <p class="text-xs text-slate-500 mt-0.5">← 清原式NC比率 + Minervini + CAN-SLIM + リバモア + Lynch(PEG) + Buffett(ROE/D/E) + MACD + BBスクイーズ + ROCモメンタム の複合スコア順</p>
     </div>
     <div id="screening-status" class="text-xs text-slate-500"></div>
   </div>
   <div id="screening-table">
-    <div class="text-slate-500 text-sm text-center py-8">「スクリーニング」ボタンを押して候補銘柄を分析してください</div>
+    <div class="text-slate-500 text-sm text-center py-8">「スクリーニング」ボタンを押して候補銘柄を分析してください（全50銘柄）</div>
   </div>
 </div>
 
 <!-- ポートフォリオ + チャート -->
 <div class="grid grid-cols-2 gap-4 mb-4">
-
   <!-- ポートフォリオ -->
   <div class="card p-5">
     <div class="flex justify-between items-center mb-3">
@@ -155,17 +203,27 @@
     </div>
   </div>
 
-  <!-- チャート -->
+  <!-- 株価チャート -->
   <div class="card p-5">
     <div class="flex justify-between items-center mb-2">
       <h2 class="font-bold text-white text-sm">📈 株価チャート（30日）</h2>
     </div>
-    <div id="ticker-tabs" class="flex flex-wrap gap-1.5 mb-3"></div>
-    <div class="relative h-52">
+    <!-- 市場フィルター -->
+    <div class="flex items-center gap-1.5 mb-2 flex-wrap">
+      <span class="text-xs text-slate-500">市場:</span>
+      <button class="market-tab active" data-market="" onclick="filterMarket(this)">全て</button>
+      <button class="market-tab" data-market="NYSE" onclick="filterMarket(this)">🇺🇸 米国</button>
+      <button class="market-tab" data-market="TSE" onclick="filterMarket(this)">🇯🇵 日本</button>
+      <button class="market-tab" data-market="LSE" onclick="filterMarket(this)">🇬🇧 英国</button>
+      <button class="market-tab" data-market="DAX" onclick="filterMarket(this)">🇩🇪 ドイツ</button>
+      <button class="market-tab" data-market="HKEX" onclick="filterMarket(this)">🇭🇰 香港</button>
+      <button class="market-tab" data-market="KOSPI" onclick="filterMarket(this)">🇰🇷 韓国</button>
+      <button class="market-tab" data-market="ASX" onclick="filterMarket(this)">🇦🇺 豪州</button>
+    </div>
+    <div id="ticker-tabs" class="flex flex-wrap gap-1 mb-3 max-h-20 overflow-y-auto"></div>
+    <div class="relative h-44">
       <canvas id="price-chart"></canvas>
-      <div id="chart-loading" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
-        銘柄を選択してください
-      </div>
+      <div id="chart-loading" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">銘柄を選択してください</div>
     </div>
     <div id="chart-info" class="mt-2 text-xs text-slate-400 flex gap-3 flex-wrap hidden">
       <span id="info-currency" class="text-slate-300 font-medium"></span>
@@ -177,42 +235,149 @@
   </div>
 </div>
 
-<!-- 資産推移 -->
-<div class="card p-5 mb-4">
-  <h2 class="font-bold text-white text-sm mb-3">💹 資産推移グラフ（円換算・累計）</h2>
-  <div class="h-36">
-    <canvas id="asset-chart"></canvas>
-  </div>
-</div>
-
 <!-- 取引履歴 -->
-<div class="card p-5">
+<div class="card p-5 mb-4">
   <h2 class="font-bold text-white text-sm mb-3">📋 取引履歴</h2>
   <div id="trades-table" class="overflow-auto max-h-72">
     <div class="text-slate-500 text-sm text-center py-8">取引履歴なし</div>
   </div>
 </div>
 
-<!-- Toast -->
+<!-- ★ バックテストパネル -->
+<div class="card p-5 mb-4 glow-amber" id="backtest-panel">
+  <div class="flex items-center justify-between collapse-btn" onclick="toggleCollapse('backtest-detail')">
+    <div>
+      <h2 class="font-bold text-white text-sm">🧪 バックテスト（過去データで戦略検証）</h2>
+      <p class="text-xs text-slate-500 mt-0.5">実際の過去株価データを使って、テクニカル戦略の成績を確認します</p>
+    </div>
+    <span id="backtest-toggle-icon" class="text-slate-400 text-xs ml-4">▼ 開く</span>
+  </div>
+  <div id="backtest-detail" class="collapse-content" style="max-height:0px;">
+    <div class="mt-4">
+      <!-- コントロール -->
+      <div class="flex items-center gap-3 mb-4">
+        <label class="text-xs text-slate-400">検証期間:</label>
+        <select id="backtest-days" class="bg-slate-800 border border-slate-600 text-white text-xs rounded-lg px-3 py-1.5">
+          <option value="90">過去3ヶ月</option>
+          <option value="180">過去6ヶ月</option>
+          <option value="365" selected>過去1年</option>
+          <option value="730">過去2年</option>
+        </select>
+        <button id="backtest-btn" class="btn-backtest" onclick="runBacktest()">▶ バックテスト実行</button>
+        <span id="backtest-status" class="text-xs text-slate-500"></span>
+      </div>
+      <!-- 結果サマリー -->
+      <div id="backtest-result" class="hidden">
+        <div class="grid grid-cols-5 gap-3 mb-4" id="backtest-stats"></div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs text-slate-400 mb-2">📈 資産推移（バックテスト）</div>
+            <div class="h-40"><canvas id="backtest-chart"></canvas></div>
+          </div>
+          <div>
+            <div class="text-xs text-slate-400 mb-2">📋 直近取引（バックテスト内）</div>
+            <div id="backtest-trades" class="overflow-auto max-h-40 text-xs"></div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 mt-3">※ バックテストはテクニカル指標のみ使用（ファンダメンタル指標は過去データ取得不可）。過去の結果は将来を保証しません。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast通知 -->
 <div id="toast" class="fixed bottom-6 right-6 px-5 py-3 rounded-xl text-sm font-medium shadow-2xl hidden z-50"></div>
 
 <script>
-const fmtJpy  = n => n == null ? '--' : Math.round(n).toLocaleString('ja-JP') + '円';
-const fmtPct  = n => n == null ? '--' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
-const fmtNum  = n => n == null ? '--' : Number(n).toLocaleString('ja-JP');
+const fmtJpy = n => n == null ? '--' : Math.round(n).toLocaleString('ja-JP') + '円';
+const fmtPct = n => n == null ? '--' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
 
-let priceChart = null, assetChart = null, selectedTicker = null;
+let priceChart = null, assetChart = null, backtestChart = null;
+let selectedTicker = null;
+let selectedMarket = '';
 let refreshTimer = 60;
+let watchlistData = [];
 
-function showToast(msg, type='success') {
+// 通知関連
+let notifEnabled = false;
+let lastTradeId = 0;
+
+// ==================== Toast ====================
+function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = `fixed bottom-6 right-6 px-5 py-3 rounded-xl text-sm font-medium shadow-2xl z-50 ${
-    type==='success' ? 'bg-emerald-600 text-white' :
-    type==='error'   ? 'bg-red-600 text-white' : 'bg-indigo-600 text-white'
+    type === 'success' ? 'bg-emerald-600 text-white' :
+    type === 'error'   ? 'bg-red-600 text-white'     : 'bg-indigo-600 text-white'
   }`;
   t.classList.remove('hidden');
   setTimeout(() => t.classList.add('hidden'), 4000);
+}
+
+// ==================== 折りたたみ ====================
+function toggleCollapse(id) {
+  const el = document.getElementById(id);
+  const isOpen = el.style.maxHeight !== '0px' && el.style.maxHeight !== '';
+  const iconId = id === 'backtest-detail' ? 'backtest-toggle-icon' : 'sector-toggle-icon';
+  const iconEl = document.getElementById(iconId);
+  if (isOpen) {
+    el.style.maxHeight = '0px';
+    if (iconEl) iconEl.textContent = '▼ 開く';
+  } else {
+    el.style.maxHeight = el.scrollHeight + 'px';
+    if (iconEl) iconEl.textContent = '▲ 閉じる';
+    // 高さが足りない場合に再調整
+    setTimeout(() => { el.style.maxHeight = 'none'; }, 350);
+  }
+}
+
+// ==================== ブラウザ通知 ====================
+async function toggleNotification() {
+  if (!("Notification" in window)) {
+    showToast("このブラウザは通知に対応していません", "error");
+    return;
+  }
+  if (notifEnabled) {
+    notifEnabled = false;
+    document.getElementById('notif-btn').textContent = '🔔 通知OFF';
+    document.getElementById('notif-btn').classList.remove('active');
+    showToast("通知をOFFにしました", "info");
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    notifEnabled = true;
+    document.getElementById('notif-btn').textContent = '🔔 通知ON';
+    document.getElementById('notif-btn').classList.add('active');
+    showToast("通知が有効になりました！取引発生時にお知らせします", "success");
+    // 現時点のIDを記録（これより前の取引は通知しない）
+    try {
+      const d = await fetch('/api/trades?limit=1').then(r => r.json());
+      if (d.trades?.length > 0) lastTradeId = d.trades[0].id;
+    } catch {}
+  } else {
+    showToast("通知の許可が拒否されました。ブラウザの設定から許可してください", "error");
+  }
+}
+
+function checkNewTrades(trades) {
+  if (!notifEnabled || !trades?.length) return;
+  const newTrades = trades.filter(t => t.id > lastTradeId);
+  if (!newTrades.length) return;
+  lastTradeId = trades[0].id;  // 最新IDを更新
+  for (const t of [...newTrades].reverse()) {
+    const label = t.action === 'buy' ? '買い' :
+      t.action === '損切り' ? '損切り' :
+      t.action === '利確' ? '利確' :
+      t.action === '部分利確' ? '部分利確' : '売り';
+    try {
+      new Notification(`${t.flag || ''} ${t.name} ${label}`, {
+        body: `${t.shares}株 / ${fmtJpy(t.total_jpy)}`,
+        icon: '',
+        tag: `trade-${t.id}`,
+      });
+    } catch {}
+  }
 }
 
 // ==================== 市場ステータス ====================
@@ -243,20 +408,72 @@ async function loadStatus() {
   try {
     const d = await fetch('/api/status').then(r => r.json());
     document.getElementById('total-assets').textContent = fmtJpy(d.total_assets);
-    const pnl_vs_init = d.total_assets - d.initial_capital;
+    const diff = d.total_assets - d.initial_capital;
     document.getElementById('total-assets-sub').textContent =
-      `初期200万円 / ${pnl_vs_init >= 0 ? '+' : ''}${fmtJpy(pnl_vs_init)}`;
+      `初期200万円 / ${diff >= 0 ? '+' : ''}${fmtJpy(diff)}`;
     document.getElementById('cash').textContent = fmtJpy(d.cash);
     const cr = d.total_assets > 0 ? (d.cash / d.total_assets * 100).toFixed(1) : 0;
     document.getElementById('cash-ratio').textContent = `現金比率 ${cr}%`;
-
     const pnlEl = document.getElementById('pnl');
     pnlEl.textContent = fmtJpy(d.pnl);
     pnlEl.className = `text-xl font-bold ${d.pnl >= 0 ? 'positive' : 'negative'}`;
-
     const pctEl = document.getElementById('pnl-pct');
     pctEl.textContent = fmtPct(d.pnl_pct);
     pctEl.className = `text-xl font-bold ${d.pnl_pct >= 0 ? 'positive' : 'negative'}`;
+  } catch(e) { console.error(e); }
+}
+
+// ==================== セクター分散 ====================
+async function loadSectorSummary() {
+  try {
+    const d = await fetch('/api/sector/summary').then(r => r.json());
+    const alertEl  = document.getElementById('sector-alert');
+    const barsEl   = document.getElementById('sector-bars');
+    const contentEl = document.getElementById('sector-content');
+
+    if (!d.sectors?.length) {
+      alertEl.classList.add('hidden');
+      contentEl.innerHTML = '<div class="text-slate-500 text-xs text-center py-4">保有株なし</div>';
+      return;
+    }
+
+    // アラート表示
+    if (d.has_concentration) {
+      alertEl.classList.remove('hidden');
+    } else {
+      alertEl.classList.add('hidden');
+    }
+
+    // セクターバー（アラート内）
+    const concentrated = d.sectors.filter(s => s.is_concentrated);
+    barsEl.innerHTML = concentrated.map(s => `
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-yellow-300 font-bold w-20">${s.sector}</span>
+        <div class="sector-bar flex-1"><div class="sector-fill bg-yellow-500" style="width:${Math.min(100, s.pct)}%"></div></div>
+        <span class="text-yellow-300 font-bold w-10 text-right">${s.pct}%</span>
+      </div>
+    `).join('');
+
+    // セクター内訳パネル
+    const colors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a78bfa','#fb923c','#34d399'];
+    contentEl.innerHTML = `
+      <div class="grid grid-cols-2 gap-2">
+        ${d.sectors.map((s, i) => `
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-sm flex-shrink-0" style="background:${colors[i % colors.length]}"></div>
+            <span class="text-xs text-slate-300 flex-1">${s.sector}</span>
+            <div class="sector-bar w-20"><div class="sector-fill" style="width:${Math.min(100, s.pct)}%; background:${colors[i % colors.length]}"></div></div>
+            <span class="text-xs font-bold ml-1 w-8 text-right ${s.is_concentrated ? 'text-yellow-400' : 'text-slate-400'}">${s.pct}%</span>
+          </div>
+        `).join('')}
+      </div>
+      <p class="text-xs text-slate-600 mt-2">1セクター30%超で新規購入を自動ストップします</p>
+    `;
+    // 開いている場合は高さを再計算
+    const detail = document.getElementById('sector-detail');
+    if (detail.style.maxHeight !== '0px' && detail.style.maxHeight !== '') {
+      detail.style.maxHeight = detail.scrollHeight + 'px';
+    }
   } catch(e) { console.error(e); }
 }
 
@@ -272,9 +489,9 @@ async function runScreening() {
   const btn = document.getElementById('screen-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> 分析中...';
-  document.getElementById('screening-status').textContent = '⏳ ファンダメンタル+テクニカルを分析中（1〜2分かかります）...';
+  document.getElementById('screening-status').textContent = '⏳ 全50銘柄を分析中（1〜3分かかります）...';
   document.getElementById('screening-table').innerHTML =
-    '<div class="text-slate-400 text-sm text-center py-8"><span class="spin mr-2"></span> 全15銘柄のデータを取得中...</div>';
+    '<div class="text-slate-400 text-sm text-center py-8"><span class="spin mr-2"></span> 全50銘柄のデータを取得中...</div>';
   try {
     const d = await fetch('/api/screening/run', {method:'POST'}).then(r => r.json());
     renderScreeningTable(d.candidates || []);
@@ -293,14 +510,13 @@ async function runScreening() {
 }
 
 function renderScreeningTable(candidates) {
-  const el = document.getElementById('screening-table');
-  const badge = document.getElementById('screened-badge');
+  const el     = document.getElementById('screening-table');
+  const badge  = document.getElementById('screened-badge');
   const countEl = document.getElementById('screened-count');
-  if (badge) badge.textContent = `${candidates.length}件`;
+  if (badge)   badge.textContent = `${candidates.length}件`;
   if (countEl) countEl.textContent = candidates.length;
-
   if (!candidates.length) {
-    el.innerHTML = '<div class="text-slate-500 text-sm text-center py-8">スクリーニング通過銘柄なし（条件を緩和するか、まずスクリーニングを実行してください）</div>';
+    el.innerHTML = '<div class="text-slate-500 text-sm text-center py-8">スクリーニング通過銘柄なし（まずスクリーニングを実行してください）</div>';
     return;
   }
   el.innerHTML = `
@@ -313,15 +529,17 @@ function renderScreeningTable(candidates) {
         <th class="pb-2 text-right">PBR</th>
         <th class="pb-2 text-right">NC比率 ★</th>
         <th class="pb-2 text-center">Minervini</th>
-        <th class="pb-2 text-center">出来高</th>
+        <th class="pb-2 text-center">戦略バッジ</th>
+        <th class="pb-2 text-right">ROE</th>
+        <th class="pb-2 text-right">PEG</th>
         <th class="pb-2 text-right">RSI</th>
         <th class="pb-2 text-right">スコア</th>
       </tr></thead>
       <tbody>
         ${candidates.map(c => {
-          const ncRatio = c.net_cash_ratio;
-          const ncBarPct = ncRatio != null ? Math.min(100, ncRatio * 50) : 0;
-          const ncColor  = ncRatio >= 1.0 ? 'text-yellow-300' : ncRatio >= 0.3 ? 'text-cyan-400' : 'text-slate-400';
+          const nc = c.net_cash_ratio;
+          const ncBarPct = nc != null ? Math.min(100, nc * 50) : 0;
+          const ncColor  = nc >= 1.0 ? 'text-yellow-300' : nc >= 0.3 ? 'text-cyan-400' : 'text-slate-400';
           const rsiColor = c.rsi14 >= 70 ? 'text-red-400' : c.rsi14 <= 30 ? 'text-green-400' : 'text-slate-300';
           const scoreColor = c.composite_score >= 40 ? 'text-green-400' : c.composite_score >= 20 ? 'text-yellow-400' : 'text-slate-400';
           return `
@@ -335,45 +553,41 @@ function renderScreeningTable(candidates) {
                 </div>
               </div>
             </td>
-            <td class="py-2.5 text-right text-slate-300">
-              ${c.current_price != null ? Number(c.current_price).toFixed(2) : '--'}
-              <span class="text-slate-500"> ${c.currency}</span>
-            </td>
+            <td class="py-2.5 text-right text-slate-300">${c.current_price != null ? Number(c.current_price).toFixed(2) : '--'}<span class="text-slate-500"> ${c.currency || ''}</span></td>
             <td class="py-2.5 text-right text-slate-300">${c.per != null ? Number(c.per).toFixed(1)+'倍' : '--'}</td>
             <td class="py-2.5 text-right text-slate-300">${c.pbr != null ? Number(c.pbr).toFixed(2)+'倍' : '--'}</td>
             <td class="py-2.5 text-right">
               <div class="flex items-center justify-end gap-2">
                 <div class="nc-bar w-12"><div class="nc-fill" style="width:${ncBarPct}%"></div></div>
-                <span class="${ncColor} font-bold">${ncRatio != null ? Number(ncRatio).toFixed(2) : '--'}</span>
+                <span class="${ncColor} font-bold">${nc != null ? Number(nc).toFixed(2) : '--'}</span>
               </div>
             </td>
+            <td class="py-2.5 text-center">${c.minervini_pass ? '<span class="text-green-400 font-bold">✅</span>' : '<span class="text-slate-600">—</span>'}</td>
             <td class="py-2.5 text-center">
-              ${c.minervini_pass ? '<span class="text-green-400 font-bold">✅</span>' : '<span class="text-slate-600">—</span>'}
+              <div class="flex flex-wrap gap-1 justify-center">
+                ${c.lynch_pass   ? '<span class="text-xs px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-700">Lynch</span>' : ''}
+                ${c.buffett_pass ? '<span class="text-xs px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-700">Buffett</span>' : ''}
+                ${c.macd_bullish ? '<span class="text-xs px-1.5 py-0.5 rounded bg-cyan-900/40 text-cyan-300 border border-cyan-700">MACD↑</span>' : ''}
+                ${c.canslim_pass ? '<span class="text-xs px-1.5 py-0.5 rounded bg-orange-900/40 text-orange-300 border border-orange-700">vol↑</span>' : ''}
+              </div>
             </td>
-            <td class="py-2.5 text-center">
-              ${c.canslim_pass ? '<span class="text-orange-400 font-bold">↑急増</span>' : '<span class="text-slate-600">—</span>'}
-            </td>
+            <td class="py-2.5 text-right text-slate-300">${c.roe != null ? (Number(c.roe)*100).toFixed(1)+'%' : '--'}</td>
+            <td class="py-2.5 text-right text-slate-300">${c.peg_ratio != null ? Number(c.peg_ratio).toFixed(2) : '--'}</td>
             <td class="py-2.5 text-right ${rsiColor}">${c.rsi14 != null ? Number(c.rsi14).toFixed(0) : '--'}</td>
-            <td class="py-2.5 text-right">
-              <span class="font-bold text-base ${scoreColor}">${Number(c.composite_score).toFixed(1)}</span>
-            </td>
+            <td class="py-2.5 text-right"><span class="font-bold text-base ${scoreColor}">${Number(c.composite_score).toFixed(1)}</span></td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
     </div>
-    <div class="mt-2 text-xs text-slate-500">
-      ★ NC比率 1.0以上 = 「現金 > 時価総額」の超安全状態（清原式の黄金指標）。スコア高い順に自動購入
-    </div>`;
+    <div class="mt-2 text-xs text-slate-500">★ NC比率 1.0以上 = 「現金 > 時価総額」の超安全状態（清原式の黄金指標） / Lynch = PEG比率&lt;1.0（割安成長株） / Buffett = ROE&gt;15%+低借金 / MACD↑ = ゴールデンクロス/上昇中。スコア高い順に自動購入</div>`;
 }
 
 // ==================== ポートフォリオ ====================
 async function loadPortfolio() {
   try {
     const d = await fetch('/api/portfolio').then(r => r.json());
-    document.getElementById('stock-value').textContent =
-      `株式評価額: ${fmtJpy(d.total_stock_value_jpy)}`;
-
+    document.getElementById('stock-value').textContent = `株式評価額: ${fmtJpy(d.total_stock_value_jpy)}`;
     const el = document.getElementById('portfolio-table');
     if (!d.holdings?.length) {
       el.innerHTML = '<div class="text-slate-500 text-sm text-center py-10">現在保有株なし</div>';
@@ -421,8 +635,7 @@ async function loadPortfolio() {
                 <span class="text-slate-500">${Number(h.stop_pct_from_peak).toFixed(1)}%</span>
               </td>
               <td class="py-2.5 text-right text-slate-400">
-                ${Number(h.target_price_local).toFixed(4)}<br>
-                <span class="text-xs">${h.unrealized_pct != null ? `+${(100 - h.unrealized_pct < 0 ? 0 : 100).toFixed(0)}%` : '--'}</span>
+                ${Number(h.target_price_local).toFixed(4)}
               </td>
             </tr>`;
           }).join('')}
@@ -435,6 +648,9 @@ async function loadPortfolio() {
 async function loadTrades() {
   try {
     const d = await fetch('/api/trades?limit=30').then(r => r.json());
+    // ブラウザ通知チェック
+    checkNewTrades(d.trades);
+
     const el = document.getElementById('trades-table');
     if (!d.trades?.length) {
       el.innerHTML = '<div class="text-slate-500 text-sm text-center py-8">取引履歴なし</div>';
@@ -487,12 +703,10 @@ async function loadChart(ticker) {
     b.classList.toggle('active', b.dataset.ticker === ticker));
   document.getElementById('chart-loading').textContent = '📡 取得中...';
   document.getElementById('chart-loading').classList.remove('hidden');
-
   try {
     const d = await fetch(`/api/chart/${ticker}`).then(r => r.json());
     document.getElementById('chart-loading').classList.add('hidden');
     document.getElementById('chart-info').classList.remove('hidden');
-
     document.getElementById('info-currency').textContent = `${d.flag} ${d.currency}`;
     document.getElementById('info-price').textContent = `${Number(d.current_price).toFixed(4)} ${d.currency}`;
     document.getElementById('info-ma5').textContent = d.ma5 ? Number(d.ma5).toFixed(2) : '--';
@@ -500,7 +714,6 @@ async function loadChart(ticker) {
     const rsiEl = document.getElementById('info-rsi');
     rsiEl.textContent = d.rsi14 ? Number(d.rsi14).toFixed(1) : '--';
     rsiEl.className = `font-medium ${d.rsi14 >= 70 ? 'text-red-400' : d.rsi14 <= 30 ? 'text-green-400' : 'text-yellow-400'}`;
-
     if (priceChart) priceChart.destroy();
     const ctx = document.getElementById('price-chart').getContext('2d');
     priceChart = new Chart(ctx, {
@@ -508,35 +721,60 @@ async function loadChart(ticker) {
       data: {
         labels: d.price_history.map(h => h.date.slice(5)),
         datasets: [
-          { label: '終値', data: d.price_history.map(h => h.close),
+          { label:'終値', data: d.price_history.map(h => h.close),
             borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.08)',
             fill:true, pointRadius:0, borderWidth:2, tension:0.3 },
-          { label: 'MA5', data: d.price_history.map(h => h.ma5),
+          { label:'MA5',  data: d.price_history.map(h => h.ma5),
             borderColor:'#60a5fa', pointRadius:0, borderWidth:1.5, tension:0.3 },
-          { label: 'MA25', data: d.price_history.map(h => h.ma25),
+          { label:'MA25', data: d.price_history.map(h => h.ma25),
             borderColor:'#fbbf24', pointRadius:0, borderWidth:1.5, tension:0.3 },
-          { label: 'MA50', data: d.price_history.map(h => h.ma50),
+          { label:'MA50', data: d.price_history.map(h => h.ma50),
             borderColor:'#a78bfa', pointRadius:0, borderWidth:1.5, tension:0.3, borderDash:[4,2] },
         ],
       },
       options: {
         responsive:true, maintainAspectRatio:false,
         plugins: {
-          legend: { labels:{ color:'#94a3b8', font:{size:11}, usePointStyle:true } },
-          tooltip: {
-            backgroundColor:'#0f1e35', borderColor:'#1e3a5f', borderWidth:1,
-            titleColor:'#e2e8f0', bodyColor:'#94a3b8',
-          }
+          legend:{ labels:{ color:'#94a3b8', font:{size:10}, usePointStyle:true } },
+          tooltip:{ backgroundColor:'#0f1e35', borderColor:'#1e3a5f', borderWidth:1,
+                    titleColor:'#e2e8f0', bodyColor:'#94a3b8' }
         },
         scales: {
-          x: { ticks:{color:'#64748b', maxTicksLimit:8}, grid:{color:'#0f1e35'} },
-          y: { ticks:{color:'#64748b'}, grid:{color:'#1e3a5f'} },
+          x:{ ticks:{color:'#64748b', maxTicksLimit:8}, grid:{color:'#0f1e35'} },
+          y:{ ticks:{color:'#64748b'}, grid:{color:'#1e3a5f'} },
         },
       },
     });
   } catch(e) {
     document.getElementById('chart-loading').textContent = '⚠️ データ取得失敗';
   }
+}
+
+// ==================== 市場フィルター ====================
+function filterMarket(btn) {
+  document.querySelectorAll('.market-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedMarket = btn.dataset.market;
+  renderTickerTabs();
+}
+
+function renderTickerTabs() {
+  const container = document.getElementById('ticker-tabs');
+  container.innerHTML = '';
+  const filtered = selectedMarket
+    ? watchlistData.filter(w => w.market === selectedMarket)
+    : watchlistData;
+  let first = true;
+  filtered.forEach(w => {
+    const btn = document.createElement('button');
+    btn.className = 'tab';
+    btn.dataset.ticker = w.ticker;
+    btn.innerHTML = `${w.flag} ${w.name.slice(0, 6)}`;
+    btn.title = `${w.name} (${w.ticker}) - ${w.currency}`;
+    btn.onclick = () => loadChart(w.ticker);
+    container.appendChild(btn);
+    if (first) { loadChart(w.ticker); first = false; }
+  });
 }
 
 // ==================== 資産推移 ====================
@@ -551,21 +789,20 @@ async function loadAssetChart() {
       data: {
         labels: h.map(x => x.date?.slice(5) || ''),
         datasets: [
-          { label: '総資産', data: h.map(x => x.total_assets),
+          { label:'総資産', data: h.map(x => x.total_assets),
             borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.1)',
             fill:true, pointRadius:2, borderWidth:2, tension:0.4 },
-          { label: '現金', data: h.map(x => x.cash),
+          { label:'現金', data: h.map(x => x.cash),
             borderColor:'#22c55e', pointRadius:0, borderWidth:1.5, tension:0.4 },
-          { label: '初期資金', data: h.map(() => 2000000),
+          { label:'初期資金', data: h.map(() => 2000000),
             borderColor:'#ef4444', borderDash:[6,3], pointRadius:0, borderWidth:1.5 },
         ],
       },
       options: {
         responsive:true, maintainAspectRatio:false,
         plugins: {
-          legend:{ labels:{color:'#94a3b8', font:{size:11}, usePointStyle:true} },
-          tooltip:{
-            backgroundColor:'#0f1e35', borderColor:'#1e3a5f', borderWidth:1,
+          legend:{ labels:{color:'#94a3b8', font:{size:10}, usePointStyle:true} },
+          tooltip:{ backgroundColor:'#0f1e35', borderColor:'#1e3a5f', borderWidth:1,
             titleColor:'#e2e8f0', bodyColor:'#94a3b8',
             callbacks:{ label: ctx => `${ctx.dataset.label}: ${fmtJpy(ctx.parsed.y)}` }
           }
@@ -576,27 +813,123 @@ async function loadAssetChart() {
         },
       },
     });
+
+    // 資産推移バッジを更新
+    const badge = document.getElementById('asset-pnl-badge');
+    if (h.length >= 2) {
+      const first = h[0].total_assets, last = h[h.length-1].total_assets;
+      const diff = last - first, pct = diff / first * 100;
+      badge.textContent = `${diff >= 0 ? '+' : ''}${fmtJpy(diff)} (${diff >= 0 ? '+' : ''}${pct.toFixed(2)}%) ← 表示期間`;
+      badge.className = `text-xs px-2 py-0.5 rounded-full border ${diff >= 0
+        ? 'bg-green-900/20 text-green-400 border-green-800'
+        : 'bg-red-900/20 text-red-400 border-red-800'}`;
+    }
   } catch(e) { console.error(e); }
 }
 
-// ==================== ウォッチリストタブ ====================
-async function loadWatchlistTabs() {
+// ==================== バックテスト ====================
+async function runBacktest() {
+  const days = parseInt(document.getElementById('backtest-days').value);
+  const btn  = document.getElementById('backtest-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 実行中...';
+  document.getElementById('backtest-status').textContent = `⏳ ${days}日分のデータを取得・分析中（1〜3分かかります）...`;
+  document.getElementById('backtest-result').classList.add('hidden');
   try {
-    const d = await fetch('/api/watchlist').then(r => r.json());
-    const container = document.getElementById('ticker-tabs');
-    container.innerHTML = '';
-    let first = true;
-    d.watchlist.forEach(w => {
-      const btn = document.createElement('button');
-      btn.className = 'tab';
-      btn.dataset.ticker = w.ticker;
-      btn.innerHTML = `${w.flag} ${w.name.slice(0,6)}`;
-      btn.title = `${w.name} (${w.ticker}) - ${w.currency}`;
-      btn.onclick = () => loadChart(w.ticker);
-      container.appendChild(btn);
-      if (first) { loadChart(w.ticker); first = false; }
+    const d = await fetch(`/api/backtest/run?days=${days}`, {method:'POST'}).then(r => r.json());
+    if (d.error) {
+      showToast(`❌ ${d.error}`, 'error');
+      document.getElementById('backtest-status').textContent = `❌ ${d.error}`;
+      return;
+    }
+    // サマリー
+    document.getElementById('backtest-stats').innerHTML = `
+      <div class="card2 p-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">最終資産</div>
+        <div class="font-bold text-white text-sm">${fmtJpy(d.final_total)}</div>
+      </div>
+      <div class="card2 p-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">損益率</div>
+        <div class="font-bold text-sm ${d.total_pnl_pct >= 0 ? 'positive' : 'negative'}">${fmtPct(d.total_pnl_pct)}</div>
+      </div>
+      <div class="card2 p-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">最大DD</div>
+        <div class="font-bold text-orange-400 text-sm">${d.max_drawdown_pct.toFixed(1)}%</div>
+      </div>
+      <div class="card2 p-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">取引回数</div>
+        <div class="font-bold text-white text-sm">${d.trade_count}件</div>
+      </div>
+      <div class="card2 p-3 text-center">
+        <div class="text-xs text-slate-400 mb-1">勝率</div>
+        <div class="font-bold text-cyan-400 text-sm">${d.win_rate}%</div>
+        <div class="text-xs text-slate-500">${d.win_count}勝${d.lose_count}敗</div>
+      </div>
+    `;
+    // チャート
+    if (backtestChart) backtestChart.destroy();
+    const btCtx = document.getElementById('backtest-chart').getContext('2d');
+    backtestChart = new Chart(btCtx, {
+      type: 'line',
+      data: {
+        labels: d.daily.map(x => x.date.slice(5)),
+        datasets: [
+          { label:'総資産', data: d.daily.map(x => x.total_assets),
+            borderColor: d.total_pnl_pct >= 0 ? '#22c55e' : '#ef4444',
+            backgroundColor: d.total_pnl_pct >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+            fill:true, pointRadius:0, borderWidth:2, tension:0.4 },
+          { label:'初期資金', data: d.daily.map(() => 2000000),
+            borderColor:'#ef444460', borderDash:[5,3], pointRadius:0, borderWidth:1 },
+        ],
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{labels:{color:'#94a3b8',font:{size:10},usePointStyle:true}},
+          tooltip:{backgroundColor:'#0f1e35',borderColor:'#1e3a5f',borderWidth:1,
+            callbacks:{label:c=>`${c.dataset.label}: ${fmtJpy(c.parsed.y)}`}}
+        },
+        scales:{
+          x:{ticks:{color:'#64748b',maxTicksLimit:8},grid:{display:false}},
+          y:{ticks:{color:'#64748b',callback:v=>fmtJpy(v)},grid:{color:'#1e3a5f'}},
+        },
+      },
     });
-  } catch(e) { console.error(e); }
+    // 取引一覧
+    const recent = d.recent_trades || [];
+    document.getElementById('backtest-trades').innerHTML = recent.length ? `
+      <table class="w-full text-xs">
+        <thead><tr class="text-slate-500 border-b border-slate-700">
+          <th class="pb-1 text-left">日付</th>
+          <th class="pb-1 text-left">銘柄</th>
+          <th class="pb-1 text-center">種別</th>
+          <th class="pb-1 text-right">損益</th>
+        </tr></thead>
+        <tbody>
+          ${recent.reverse().map(t => {
+            const label = t.action === 'buy' ? '買' : t.action === '損切り' ? '損切' : t.action === '利確' ? '利確' : '売';
+            const cl = t.action === 'buy' ? 'text-green-400' : t.pnl_pct >= 0 ? 'text-orange-400' : 'text-red-400';
+            return `<tr class="border-b border-slate-800">
+              <td class="py-1 text-slate-500">${t.date.slice(5)}</td>
+              <td class="py-1">${t.flag}${t.name.slice(0,5)}</td>
+              <td class="py-1 text-center ${cl} font-bold">${label}</td>
+              <td class="py-1 text-right ${cl}">${t.pnl_pct !== 0 ? (t.pnl_pct > 0 ? '+' : '') + t.pnl_pct.toFixed(1) + '%' : '--'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>` : '<div class="text-slate-500 text-center py-4">取引なし</div>';
+
+    document.getElementById('backtest-result').classList.remove('hidden');
+    document.getElementById('backtest-status').textContent = `✅ ${days}日間の検証完了`;
+    showToast(`✅ バックテスト完了！損益: ${fmtPct(d.total_pnl_pct)}`, d.total_pnl_pct >= 0 ? 'success' : 'error');
+  } catch(e) {
+    showToast('❌ バックテストエラー', 'error');
+    document.getElementById('backtest-status').textContent = '❌ エラーが発生しました';
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶ バックテスト実行';
+  }
 }
 
 // ==================== 手動取引 ====================
@@ -607,8 +940,7 @@ async function runTrade() {
   try {
     const d = await fetch('/api/trade/run', {method:'POST'}).then(r => r.json());
     if (d.status === 'success') {
-      const sold = d.sold_tickers?.length || 0;
-      const bought = d.bought_tickers?.length || 0;
+      const sold = d.sold_tickers?.length || 0, bought = d.bought_tickers?.length || 0;
       showToast(`✅ 取引完了！売${sold}件 / 買${bought}件`, 'success');
     } else {
       showToast(`⚠️ ${d.message || 'エラー'}`, 'error');
@@ -630,6 +962,15 @@ async function resetData() {
   await loadScreening();
 }
 
+// ==================== ウォッチリスト初期化 ====================
+async function loadWatchlistTabs() {
+  try {
+    const d = await fetch('/api/watchlist').then(r => r.json());
+    watchlistData = d.watchlist || [];
+    renderTickerTabs();
+  } catch(e) { console.error(e); }
+}
+
 // ==================== 全データ更新 ====================
 async function loadAll() {
   await Promise.all([
@@ -639,6 +980,7 @@ async function loadAll() {
     loadTrades(),
     loadAssetChart(),
     loadScreening(),
+    loadSectorSummary(),
   ]);
   if (selectedTicker) loadChart(selectedTicker);
 }

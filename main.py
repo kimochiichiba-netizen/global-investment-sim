@@ -248,6 +248,56 @@ async def reset():
     return {"status": "ok", "message": "リセット完了。初期資金200万円からスタートします。"}
 
 
+# ── セクター分散 API ───────────────────────────────────
+
+@app.get("/api/sector/summary")
+async def get_sector_summary():
+    """保有ポートフォリオのセクター別集中度を返す"""
+    portfolio = get_portfolio()
+    fx_rates  = get_fx_rates()
+    sector_map: dict = {}
+    total_jpy = 0.0
+
+    for h in portfolio:
+        info    = GLOBAL_WATCHLIST.get(h["ticker"], {})
+        sector  = info.get("sector", "その他")
+        val_jpy = h.get("avg_cost_jpy", 0) * h.get("shares", 0)
+        total_jpy += val_jpy
+        sector_map[sector] = sector_map.get(sector, 0.0) + val_jpy
+
+    result = []
+    for sector, val in sorted(sector_map.items(), key=lambda x: -x[1]):
+        pct = val / total_jpy * 100 if total_jpy > 0 else 0
+        result.append({
+            "sector":          sector,
+            "value_jpy":       round(val, 0),
+            "pct":             round(pct, 1),
+            "is_concentrated": pct > 30,
+        })
+
+    return {
+        "sectors":           result,
+        "has_concentration": any(r["is_concentrated"] for r in result),
+        "total_stock_jpy":   round(total_jpy, 0),
+    }
+
+
+# ── バックテスト API ────────────────────────────────────
+
+@app.post("/api/backtest/run")
+async def run_backtest_api(days: int = 365):
+    """
+    過去 days 日分の実際の株価データで戦略を検証します。
+    テクニカル指標のみ使用（ファンダメンタルは過去データが取得不可のため除外）。
+    データDL込みで1〜3分かかります。
+    """
+    import asyncio
+    from backtest import run_backtest as _run_backtest
+    loop   = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, lambda: _run_backtest(days))
+    return result
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🌍 グローバル投資シミュレーター v2.0 を起動します")

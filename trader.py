@@ -22,7 +22,7 @@ from database import (
     upsert_holding, delete_holding,
     save_trade, update_cash, save_asset_snapshot,
     update_trailing_stop, mark_partial_taken, recently_sold,
-    get_screened_stocks,
+    get_last_sell_action, get_screened_stocks,
 )
 from market_hours import get_open_markets
 from global_stocks import (
@@ -71,6 +71,22 @@ def _calc_trailing_stop(peak_price_local: float, pnl_pct: float) -> float:
     return round(peak_price_local * pct, 6)
 
 
+def _check_sector_concentration(ticker: str, portfolio: List[Dict], total_assets: float) -> Tuple[bool, str]:
+    """
+    同一セクターへの集中を確認する（上限30%）。
+    例: テック系が総資産の30%を超えている場合は追加購入を止める。
+    """
+    sector = GLOBAL_WATCHLIST.get(ticker, {}).get("sector", "その他")
+    sector_cost = 0.0
+    for h in portfolio:
+        h_sector = GLOBAL_WATCHLIST.get(h["ticker"], {}).get("sector", "その他")
+        if h_sector == sector:
+            sector_cost += h.get("avg_cost_jpy", 0) * h.get("shares", 0)
+    if total_assets > 0 and (sector_cost / total_assets) > 0.30:
+        return False, f"セクター「{sector}」が30%超集中"
+    return True, ""
+
+
 def _calc_position_size(total_assets: float, composite_score: float) -> float:
     """
     composite_score（0〜80程度）に応じてポジションサイズを動的配分。
@@ -79,6 +95,37 @@ def _calc_position_size(total_assets: float, composite_score: float) -> float:
     # スコア0 → 5%、スコア50以上 → 15%
     ratio = MIN_POSITION_RATIO + (MAX_POSITION_RATIO - MIN_POSITION_RATIO) * min(1.0, composite_score / 50.0)
     return max(MIN_POSITION_RATIO, min(MAX_POSITION_RATIO, ratio))
+
+
+def _calc_shares_atr(total_assets: float, price_j: float, atr_local: float, fx_rate: float) -> int:
+    """
+    Van Tharp 1Rルール（ATRベースのポジションサイジング）
+
+    例え話:
+      「1回の取引で損するのは総資産の1%まで」というルール。
+      ATR（Average True Range）とは「1日の典型的な値動き幅」のこと。
+      ストップを「ATR×2」に置くので、その分損する可能性がある。
+      逆算してどれだけ買えるか計算する。
+
+    計算式:
+      リスク額  = 総資産 × 1%
+      ストップ幅 = ATR × 2 (円換算)
+      株数      = リスク額 ÷ ストップ幅
+
+    ATRが大きい（値動きが激しい）銘柄 → 少ない株数（リスクを抑える）
+    ATRが小さい（値動きが安定）銘柄   → 多い株数（同じリスクでより多く持てる）
+    """
+    if atr_local is None or atr_local <= 0 or price_j <= 0:
+        return 0
+
+    risk_jpy       = total_assets * 0.01          # リスク額 = 総資産の1%
+    stop_width_jpy = atr_local * fx_rate * 2.0    # ストップ幅 = ATR×2 (円換算)
+
+    if stop_width_jpy <= 0:
+        return 0
+
+    shares = int(risk_jpy / stop_width_jpy)
+    return max(1, shares)
 
 
 def _decide_sell(holding: Dict, price_local: float) -> Tuple[Optional[str], str]:
@@ -237,10 +284,15 @@ def run_buy_execution(summaries_dict: Dict[str, Dict], fx_rates: Dict, total_ass
         if holding:
             continue
 
-        # 直近3日以内に売却した銘柄はスキップ（往復売買コスト節約）
-        if recently_sold(ticker, days=3):
-            print(f"  ⏭ {ticker}: 直近3日以内に売却済みのためスキップ")
-            continue
+        # 売却種別に応じた再購入禁止期間:
+        #   損切り → 3日（危険な銘柄なので冷却期間を長く）
+        #   利確/部分利確 → 1日（好調な銘柄なので翌日から再参入OK）
+        last_sell = get_last_sell_action(ticker)
+        if last_sell:
+            wait_days = 3 if last_sell["action"] == "損切り" else 1
+            if recently_sold(ticker, days=wait_days):
+                print(f"  ⏭ {ticker}: 直近{wait_days}日以内に{last_sell['action']}済みのためスキップ")
+                continue
 
         summary = summaries_dict.get(ticker)
         if not summary:
@@ -252,6 +304,13 @@ def run_buy_execution(summaries_dict: Dict[str, Dict], fx_rates: Dict, total_ass
             print(f"  ⏭ {ticker}: RSI{rsi:.0f}が上限({RSI_MAX_FOR_BUY})超過のためスキップ")
             continue
 
+        # セクター集中チェック（同一セクター30%超はスキップ）
+        portfolio_now = get_portfolio()
+        sector_ok, sector_msg = _check_sector_concentration(ticker, portfolio_now, total_assets)
+        if not sector_ok:
+            print(f"  ⏭ {ticker}: {sector_msg}のためスキップ")
+            continue
+
         currency = summary["currency"]
         fx_rate  = fx_rates.get(currency, 1.0)
         price_l  = summary["current_price"]
@@ -260,10 +319,23 @@ def run_buy_execution(summaries_dict: Dict[str, Dict], fx_rates: Dict, total_ass
         if price_j <= 0:
             continue
 
-        # ポジションサイズ（composite_scoreに応じて動的配分）
-        position_ratio = _calc_position_size(total_assets, candidate["composite_score"])
-        max_jpy        = total_assets * position_ratio
-        buy_shares     = max(1, int(max_jpy / price_j))
+        # ── ポジションサイジング（ATRベース + スコアベースで大きい方を採用）──
+        atr14 = summary.get("atr14")
+        atr_shares   = _calc_shares_atr(total_assets, price_j, atr14, fx_rate)
+
+        # スコアベース（保険: ATRデータがない場合のフォールバック）
+        position_ratio  = _calc_position_size(total_assets, candidate["composite_score"])
+        max_jpy         = total_assets * position_ratio
+        score_shares    = max(1, int(max_jpy / price_j))
+
+        # ATRシグナルがあれば優先、なければスコアベース
+        if atr_shares > 0:
+            buy_shares = atr_shares
+        else:
+            buy_shares = score_shares
+
+        # 上限チェック: スコアベースの最大株数を超えないよう制限
+        buy_shares = min(buy_shares, score_shares)
 
         trade_jpy  = price_j * buy_shares
         commission = calc_commission(trade_jpy)

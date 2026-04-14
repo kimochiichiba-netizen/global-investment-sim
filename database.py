@@ -110,6 +110,12 @@ def init_db():
             last_updated DATE
         )
     """)
+    # バフェット・リンチ用ファンダメンタル指標列を追加
+    _add_column_if_not_exists(cur, "fundamental_cache", "roe",             "REAL")
+    _add_column_if_not_exists(cur, "fundamental_cache", "debt_to_equity",  "REAL")
+    _add_column_if_not_exists(cur, "fundamental_cache", "peg_ratio",       "REAL")
+    _add_column_if_not_exists(cur, "fundamental_cache", "earnings_growth",  "REAL")
+    _add_column_if_not_exists(cur, "fundamental_cache", "operating_margin", "REAL")
 
     # スクリーニング通過銘柄（スコア降順で保存）
     cur.execute("""
@@ -134,6 +140,14 @@ def init_db():
             screened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Lynch / Buffett / MACD 戦略フラグを追加
+    _add_column_if_not_exists(cur, "screened_stocks", "lynch_pass",   "INTEGER DEFAULT 0")
+    _add_column_if_not_exists(cur, "screened_stocks", "buffett_pass", "INTEGER DEFAULT 0")
+    _add_column_if_not_exists(cur, "screened_stocks", "macd_bullish", "INTEGER DEFAULT 0")
+    _add_column_if_not_exists(cur, "screened_stocks", "roc20",        "REAL")
+    _add_column_if_not_exists(cur, "screened_stocks", "bb_width",     "REAL")
+    _add_column_if_not_exists(cur, "screened_stocks", "roe",          "REAL")
+    _add_column_if_not_exists(cur, "screened_stocks", "peg_ratio",    "REAL")
 
     cur.execute("SELECT id FROM account WHERE id = 1")
     if not cur.fetchone():
@@ -287,6 +301,18 @@ def recently_sold(ticker: str, days: int = 3) -> bool:
     return row is not None
 
 
+def get_last_sell_action(ticker: str) -> Optional[Dict]:
+    """直近の売却情報（action と executed_at）を返す。なければ None"""
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT action, executed_at FROM trades
+        WHERE ticker = ? AND action IN ('sell', '損切り', '利確', '部分利確')
+        ORDER BY executed_at DESC LIMIT 1
+    """, (ticker,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 # ==================== asset_history ====================
 
 def save_asset_snapshot(total: float, cash: float, stock_value: float):
@@ -334,10 +360,12 @@ def save_fundamental_cache(data: Dict):
         INSERT INTO fundamental_cache
             (ticker, name, market_cap, market_cap_usd, per, pbr,
              current_assets, total_debt, cash_and_equiv, net_cash,
-             net_cash_ratio, dividend_yield, sector, currency, last_updated)
+             net_cash_ratio, dividend_yield, sector, currency, last_updated,
+             roe, debt_to_equity, peg_ratio, earnings_growth, operating_margin)
         VALUES (:ticker, :name, :market_cap, :market_cap_usd, :per, :pbr,
                 :current_assets, :total_debt, :cash_and_equiv, :net_cash,
-                :net_cash_ratio, :dividend_yield, :sector, :currency, :last_updated)
+                :net_cash_ratio, :dividend_yield, :sector, :currency, :last_updated,
+                :roe, :debt_to_equity, :peg_ratio, :earnings_growth, :operating_margin)
         ON CONFLICT(ticker) DO UPDATE SET
             name=excluded.name, market_cap=excluded.market_cap,
             market_cap_usd=excluded.market_cap_usd, per=excluded.per,
@@ -345,7 +373,10 @@ def save_fundamental_cache(data: Dict):
             total_debt=excluded.total_debt, cash_and_equiv=excluded.cash_and_equiv,
             net_cash=excluded.net_cash, net_cash_ratio=excluded.net_cash_ratio,
             dividend_yield=excluded.dividend_yield, sector=excluded.sector,
-            currency=excluded.currency, last_updated=excluded.last_updated
+            currency=excluded.currency, last_updated=excluded.last_updated,
+            roe=excluded.roe, debt_to_equity=excluded.debt_to_equity,
+            peg_ratio=excluded.peg_ratio, earnings_growth=excluded.earnings_growth,
+            operating_margin=excluded.operating_margin
     """, data)
     conn.commit()
     conn.close()
@@ -366,10 +397,12 @@ def save_screened_stock(data: Dict):
         INSERT INTO screened_stocks
             (ticker, name, market, currency, flag, market_cap, per, pbr,
              net_cash_ratio, composite_score, minervini_pass, canslim_pass,
-             current_price, rsi14, ma50, ma150, ma200)
+             current_price, rsi14, ma50, ma150, ma200,
+             lynch_pass, buffett_pass, macd_bullish, roc20, bb_width, roe, peg_ratio)
         VALUES (:ticker, :name, :market, :currency, :flag, :market_cap, :per, :pbr,
                 :net_cash_ratio, :composite_score, :minervini_pass, :canslim_pass,
-                :current_price, :rsi14, :ma50, :ma150, :ma200)
+                :current_price, :rsi14, :ma50, :ma150, :ma200,
+                :lynch_pass, :buffett_pass, :macd_bullish, :roc20, :bb_width, :roe, :peg_ratio)
         ON CONFLICT(ticker) DO UPDATE SET
             composite_score=excluded.composite_score,
             minervini_pass=excluded.minervini_pass,
@@ -379,6 +412,13 @@ def save_screened_stock(data: Dict):
             ma150=excluded.ma150, ma200=excluded.ma200,
             per=excluded.per, pbr=excluded.pbr,
             net_cash_ratio=excluded.net_cash_ratio,
+            lynch_pass=excluded.lynch_pass,
+            buffett_pass=excluded.buffett_pass,
+            macd_bullish=excluded.macd_bullish,
+            roc20=excluded.roc20,
+            bb_width=excluded.bb_width,
+            roe=excluded.roe,
+            peg_ratio=excluded.peg_ratio,
             screened_at=CURRENT_TIMESTAMP
     """, data)
     conn.commit()

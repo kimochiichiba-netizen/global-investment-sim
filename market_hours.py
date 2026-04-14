@@ -53,6 +53,24 @@ MARKETS = {
         "currency": "USD",
         "color":    "#22c55e",   # グリーン
     },
+    "KOSPI": {
+        "name":     "ソウル",
+        "tz":       "Asia/Seoul",
+        "open":     (9, 0),
+        "close":    (15, 30),
+        "flag":     "🇰🇷",
+        "currency": "KRW",
+        "color":    "#6366f1",   # インディゴ
+    },
+    "ASX": {
+        "name":     "シドニー",
+        "tz":       "Australia/Sydney",
+        "open":     (10, 0),
+        "close":    (16, 0),
+        "flag":     "🇦🇺",
+        "currency": "AUD",
+        "color":    "#10b981",   # エメラルド
+    },
 }
 
 
