@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🌍 グローバル投資シミュレーター</title>
+  <title>🌍 グローバル投資シミュレーター Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -13,11 +13,9 @@
     .positive { color: #22c55e; }
     .negative { color: #ef4444; }
 
-    /* 市場バッジ */
     .mkt-open   { background:#052e16; border:1px solid #16a34a; color:#4ade80; }
     .mkt-closed { background:#1a1a2e; border:1px solid #334155; color:#64748b; }
 
-    /* ボタン */
     .btn-run {
       background: linear-gradient(135deg,#6366f1,#8b5cf6);
       color:#fff; border:none; border-radius:10px;
@@ -26,6 +24,14 @@
     }
     .btn-run:hover { opacity:.85; }
     .btn-run:disabled { opacity:.45; cursor:not-allowed; }
+    .btn-screen {
+      background: linear-gradient(135deg,#0ea5e9,#06b6d4);
+      color:#fff; border:none; border-radius:10px;
+      padding:8px 18px; cursor:pointer; font-weight:700;
+      transition:opacity .2s; font-size:13px;
+    }
+    .btn-screen:hover { opacity:.85; }
+    .btn-screen:disabled { opacity:.45; cursor:not-allowed; }
     .btn-reset {
       background:#ef444415; color:#ef4444;
       border:1px solid #ef4444; border-radius:10px;
@@ -33,24 +39,28 @@
     }
     .btn-reset:hover { background:#ef444430; }
 
-    /* タブ */
     .tab { padding:5px 12px; border-radius:6px; font-size:12px; cursor:pointer;
            border:1px solid #1e3a5f; color:#64748b; background:transparent; }
     .tab.active { background:#6366f1; color:#fff; border-color:#6366f1; }
 
-    /* バッジ */
-    .badge-buy  { background:#16a34a20; color:#22c55e; border:1px solid #16a34a; }
-    .badge-sell { background:#dc262620; color:#ef4444; border:1px solid #dc2626; }
+    .badge-buy    { background:#16a34a20; color:#22c55e; border:1px solid #16a34a; }
+    .badge-sell   { background:#dc262620; color:#ef4444; border:1px solid #dc2626; }
+    .badge-利確   { background:#d9770620; color:#f97316; border:1px solid #d97706; }
+    .badge-部分利確{ background:#ca8a0420; color:#eab308; border:1px solid #ca8a04; }
+    .badge-損切り { background:#7f1d1d20; color:#fca5a5; border:1px solid #7f1d1d; }
 
-    /* スピナー */
-    .spin { width:16px; height:16px; border:3px solid #ffffff30;
+    .spin { width:14px; height:14px; border:2px solid #ffffff30;
             border-top-color:#fff; border-radius:50%;
             animation:spin .7s linear infinite; display:inline-block; }
     @keyframes spin { to { transform:rotate(360deg); } }
 
-    /* グロー効果 */
     .glow-green { box-shadow: 0 0 20px #22c55e30; }
     .glow-blue  { box-shadow: 0 0 20px #6366f130; }
+    .glow-cyan  { box-shadow: 0 0 20px #06b6d430; }
+
+    /* NC比率バー */
+    .nc-bar { height:6px; border-radius:3px; background:#1e3a5f; overflow:hidden; }
+    .nc-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#06b6d4,#6366f1); }
 
     ::-webkit-scrollbar { width:5px; }
     ::-webkit-scrollbar-track { background:#0f1e35; }
@@ -64,45 +74,68 @@
   <div class="flex items-center gap-3">
     <span class="text-4xl">🌍</span>
     <div>
-      <h1 class="text-2xl font-bold text-white">グローバル投資シミュレーター</h1>
-      <p class="text-xs text-slate-500">5市場・15銘柄 / 仮想資金200万円 / 24時間自動売買</p>
+      <h1 class="text-2xl font-bold text-white">グローバル投資シミュレーター
+        <span class="text-xs bg-indigo-900 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded-full ml-2">Pro v2</span>
+      </h1>
+      <p class="text-xs text-slate-500">5市場・15銘柄 / 仮想資金200万円 / 清原式+Minervini+CAN-SLIM 複合戦略</p>
     </div>
   </div>
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-2">
     <div id="countdown-badge" class="text-xs text-slate-500 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700">
       更新: --秒
     </div>
-    <button id="run-btn" class="btn-run" onclick="runTrade()">⚡ 今すぐ取引</button>
+    <button id="screen-btn" class="btn-screen" onclick="runScreening()">🔍 スクリーニング</button>
+    <button id="run-btn" class="btn-run" onclick="runTrade()">⚡ 取引実行</button>
     <button class="btn-reset" onclick="resetData()">🔄 リセット</button>
   </div>
 </div>
 
 <!-- 市場ステータス -->
-<div id="market-cards" class="grid grid-cols-5 gap-3 mb-6">
-  <!-- JSで生成 -->
-</div>
+<div id="market-cards" class="grid grid-cols-5 gap-3 mb-5"></div>
 
 <!-- サマリーカード -->
-<div class="grid grid-cols-4 gap-4 mb-5">
-  <div class="card p-5 glow-blue">
+<div class="grid grid-cols-6 gap-3 mb-5">
+  <div class="card p-4 glow-blue col-span-2">
     <div class="text-xs text-slate-400 mb-1">総資産（円換算）</div>
     <div id="total-assets" class="text-2xl font-bold text-white">--</div>
     <div id="total-assets-sub" class="text-xs text-slate-500 mt-1">初期: 200万円</div>
   </div>
-  <div class="card p-5">
+  <div class="card p-4">
     <div class="text-xs text-slate-400 mb-1">現金残高</div>
-    <div id="cash" class="text-2xl font-bold text-white">--</div>
+    <div id="cash" class="text-xl font-bold text-white">--</div>
     <div id="cash-ratio" class="text-xs text-slate-500 mt-1">--</div>
   </div>
-  <div class="card p-5">
+  <div class="card p-4">
     <div class="text-xs text-slate-400 mb-1">損益額</div>
-    <div id="pnl" class="text-2xl font-bold">--</div>
+    <div id="pnl" class="text-xl font-bold">--</div>
     <div class="text-xs text-slate-400 mt-1">初期比</div>
   </div>
-  <div class="card p-5">
+  <div class="card p-4">
     <div class="text-xs text-slate-400 mb-1">損益率</div>
-    <div id="pnl-pct" class="text-2xl font-bold">--</div>
+    <div id="pnl-pct" class="text-xl font-bold">--</div>
     <div class="text-xs text-slate-500 mt-1">スタートから</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-xs text-slate-400 mb-1">候補銘柄</div>
+    <div id="screened-count" class="text-xl font-bold text-cyan-400">--</div>
+    <div class="text-xs text-slate-500 mt-1">スクリーニング通過</div>
+  </div>
+</div>
+
+<!-- スクリーニング結果 -->
+<div class="card p-5 mb-4 glow-cyan" id="screening-section">
+  <div class="flex justify-between items-center mb-3">
+    <div>
+      <h2 class="font-bold text-white text-sm">
+        🔍 投資候補（スクリーニング通過銘柄）
+        <span id="screened-badge" class="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full ml-2">0件</span>
+      </h2>
+      <p class="text-xs text-slate-500 mt-0.5">← 清原式NC比率 + Minervini(MA50>150>200) + CAN-SLIM出来高 + リバモア高値突破 の複合スコア順</p>
+    </div>
+    <div id="screening-status" class="text-xs text-slate-500"></div>
+  </div>
+  <div id="screening-table">
+    <div class="text-slate-500 text-sm text-center py-8">「スクリーニング」ボタンを押して候補銘柄を分析してください</div>
   </div>
 </div>
 
@@ -112,10 +145,12 @@
   <!-- ポートフォリオ -->
   <div class="card p-5">
     <div class="flex justify-between items-center mb-3">
-      <h2 class="font-bold text-white">💼 保有ポートフォリオ</h2>
+      <h2 class="font-bold text-white text-sm">💼 保有ポートフォリオ
+        <span class="text-xs text-slate-500 ml-1">← トレーリングストップで利益を守る</span>
+      </h2>
       <span id="stock-value" class="text-sm text-slate-400">--</span>
     </div>
-    <div id="portfolio-table" class="overflow-auto max-h-72">
+    <div id="portfolio-table" class="overflow-auto max-h-80">
       <div class="text-slate-500 text-sm text-center py-10">読み込み中...</div>
     </div>
   </div>
@@ -123,7 +158,7 @@
   <!-- チャート -->
   <div class="card p-5">
     <div class="flex justify-between items-center mb-2">
-      <h2 class="font-bold text-white">📈 株価チャート（30日）</h2>
+      <h2 class="font-bold text-white text-sm">📈 株価チャート（30日）</h2>
     </div>
     <div id="ticker-tabs" class="flex flex-wrap gap-1.5 mb-3"></div>
     <div class="relative h-52">
@@ -132,10 +167,11 @@
         銘柄を選択してください
       </div>
     </div>
-    <div id="chart-info" class="mt-2 text-xs text-slate-400 flex gap-4 hidden">
+    <div id="chart-info" class="mt-2 text-xs text-slate-400 flex gap-3 flex-wrap hidden">
       <span id="info-currency" class="text-slate-300 font-medium"></span>
       <span>現在値: <span id="info-price" class="text-white font-medium"></span></span>
       <span>MA5: <span id="info-ma5" class="text-blue-400 font-medium"></span></span>
+      <span>MA50: <span id="info-ma50" class="text-purple-400 font-medium"></span></span>
       <span>RSI: <span id="info-rsi" class="font-medium"></span></span>
     </div>
   </div>
@@ -143,7 +179,7 @@
 
 <!-- 資産推移 -->
 <div class="card p-5 mb-4">
-  <h2 class="font-bold text-white mb-3">💹 資産推移グラフ（円換算・累計）</h2>
+  <h2 class="font-bold text-white text-sm mb-3">💹 資産推移グラフ（円換算・累計）</h2>
   <div class="h-36">
     <canvas id="asset-chart"></canvas>
   </div>
@@ -151,7 +187,7 @@
 
 <!-- 取引履歴 -->
 <div class="card p-5">
-  <h2 class="font-bold text-white mb-3">📋 取引履歴</h2>
+  <h2 class="font-bold text-white text-sm mb-3">📋 取引履歴</h2>
   <div id="trades-table" class="overflow-auto max-h-72">
     <div class="text-slate-500 text-sm text-center py-8">取引履歴なし</div>
   </div>
@@ -161,10 +197,9 @@
 <div id="toast" class="fixed bottom-6 right-6 px-5 py-3 rounded-xl text-sm font-medium shadow-2xl hidden z-50"></div>
 
 <script>
-// ==================== ユーティリティ ====================
 const fmtJpy  = n => n == null ? '--' : Math.round(n).toLocaleString('ja-JP') + '円';
-const fmtPct  = n => n == null ? '--' : (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
-const fmtNum  = n => n == null ? '--' : n.toLocaleString('ja-JP');
+const fmtPct  = n => n == null ? '--' : (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
+const fmtNum  = n => n == null ? '--' : Number(n).toLocaleString('ja-JP');
 
 let priceChart = null, assetChart = null, selectedTicker = null;
 let refreshTimer = 60;
@@ -186,18 +221,18 @@ async function loadMarkets() {
     const d = await fetch('/api/markets').then(r => r.json());
     const el = document.getElementById('market-cards');
     el.innerHTML = Object.entries(d).map(([key, m]) => `
-      <div class="card p-4 ${m.is_open ? 'mkt-open' : 'mkt-closed'} rounded-xl">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xl">${m.flag}</span>
-          <span class="text-xs px-2 py-0.5 rounded-full ${m.is_open
+      <div class="card p-3 ${m.is_open ? 'mkt-open' : 'mkt-closed'} rounded-xl">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-lg">${m.flag}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded-full ${m.is_open
             ? 'bg-green-900 text-green-300 border border-green-700'
             : 'bg-slate-800 text-slate-500 border border-slate-700'}">
-            ${m.is_open ? '● 開場中' : '○ 閉場'}
+            ${m.is_open ? '● 開場' : '○ 閉場'}
           </span>
         </div>
-        <div class="font-bold text-sm ${m.is_open ? 'text-white' : 'text-slate-400'}">${m.name}</div>
-        <div class="text-lg font-mono font-bold mt-1 ${m.is_open ? 'text-green-300' : 'text-slate-500'}">${m.local_time}</div>
-        <div class="text-xs text-slate-500 mt-1">${m.open_time}〜${m.close_time}</div>
+        <div class="font-bold text-xs ${m.is_open ? 'text-white' : 'text-slate-400'}">${m.name}</div>
+        <div class="text-base font-mono font-bold mt-1 ${m.is_open ? 'text-green-300' : 'text-slate-500'}">${m.local_time}</div>
+        <div class="text-xs text-slate-500 mt-0.5">${m.open_time}〜${m.close_time}</div>
       </div>
     `).join('');
   } catch(e) { console.error(e); }
@@ -208,18 +243,128 @@ async function loadStatus() {
   try {
     const d = await fetch('/api/status').then(r => r.json());
     document.getElementById('total-assets').textContent = fmtJpy(d.total_assets);
+    const pnl_vs_init = d.total_assets - d.initial_capital;
+    document.getElementById('total-assets-sub').textContent =
+      `初期200万円 / ${pnl_vs_init >= 0 ? '+' : ''}${fmtJpy(pnl_vs_init)}`;
     document.getElementById('cash').textContent = fmtJpy(d.cash);
     const cr = d.total_assets > 0 ? (d.cash / d.total_assets * 100).toFixed(1) : 0;
-    document.getElementById('cash-ratio').textContent = `総資産の ${cr}%`;
+    document.getElementById('cash-ratio').textContent = `現金比率 ${cr}%`;
 
     const pnlEl = document.getElementById('pnl');
     pnlEl.textContent = fmtJpy(d.pnl);
-    pnlEl.className = `text-2xl font-bold ${d.pnl >= 0 ? 'positive' : 'negative'}`;
+    pnlEl.className = `text-xl font-bold ${d.pnl >= 0 ? 'positive' : 'negative'}`;
 
     const pctEl = document.getElementById('pnl-pct');
     pctEl.textContent = fmtPct(d.pnl_pct);
-    pctEl.className = `text-2xl font-bold ${d.pnl_pct >= 0 ? 'positive' : 'negative'}`;
+    pctEl.className = `text-xl font-bold ${d.pnl_pct >= 0 ? 'positive' : 'negative'}`;
   } catch(e) { console.error(e); }
+}
+
+// ==================== スクリーニング ====================
+async function loadScreening() {
+  try {
+    const d = await fetch('/api/screening').then(r => r.json());
+    renderScreeningTable(d.candidates || []);
+  } catch(e) { console.error(e); }
+}
+
+async function runScreening() {
+  const btn = document.getElementById('screen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 分析中...';
+  document.getElementById('screening-status').textContent = '⏳ ファンダメンタル+テクニカルを分析中（1〜2分かかります）...';
+  document.getElementById('screening-table').innerHTML =
+    '<div class="text-slate-400 text-sm text-center py-8"><span class="spin mr-2"></span> 全15銘柄のデータを取得中...</div>';
+  try {
+    const d = await fetch('/api/screening/run', {method:'POST'}).then(r => r.json());
+    renderScreeningTable(d.candidates || []);
+    document.getElementById('screened-count').textContent = d.count;
+    document.getElementById('screened-badge').textContent = `${d.count}件`;
+    document.getElementById('screening-status').textContent =
+      `最終実行: ${new Date(d.executed_at).toLocaleTimeString('ja-JP')}`;
+    showToast(`✅ スクリーニング完了！${d.count}銘柄が通過`, 'success');
+  } catch(e) {
+    showToast('❌ スクリーニングエラー', 'error');
+    document.getElementById('screening-status').textContent = '❌ エラーが発生しました';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔍 スクリーニング';
+  }
+}
+
+function renderScreeningTable(candidates) {
+  const el = document.getElementById('screening-table');
+  const badge = document.getElementById('screened-badge');
+  const countEl = document.getElementById('screened-count');
+  if (badge) badge.textContent = `${candidates.length}件`;
+  if (countEl) countEl.textContent = candidates.length;
+
+  if (!candidates.length) {
+    el.innerHTML = '<div class="text-slate-500 text-sm text-center py-8">スクリーニング通過銘柄なし（条件を緩和するか、まずスクリーニングを実行してください）</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead><tr class="text-slate-400 border-b border-slate-700">
+        <th class="pb-2 text-left">銘柄</th>
+        <th class="pb-2 text-right">現在値</th>
+        <th class="pb-2 text-right">PER</th>
+        <th class="pb-2 text-right">PBR</th>
+        <th class="pb-2 text-right">NC比率 ★</th>
+        <th class="pb-2 text-center">Minervini</th>
+        <th class="pb-2 text-center">出来高</th>
+        <th class="pb-2 text-right">RSI</th>
+        <th class="pb-2 text-right">スコア</th>
+      </tr></thead>
+      <tbody>
+        ${candidates.map(c => {
+          const ncRatio = c.net_cash_ratio;
+          const ncBarPct = ncRatio != null ? Math.min(100, ncRatio * 50) : 0;
+          const ncColor  = ncRatio >= 1.0 ? 'text-yellow-300' : ncRatio >= 0.3 ? 'text-cyan-400' : 'text-slate-400';
+          const rsiColor = c.rsi14 >= 70 ? 'text-red-400' : c.rsi14 <= 30 ? 'text-green-400' : 'text-slate-300';
+          const scoreColor = c.composite_score >= 40 ? 'text-green-400' : c.composite_score >= 20 ? 'text-yellow-400' : 'text-slate-400';
+          return `
+          <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+            <td class="py-2.5">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm">${c.flag}</span>
+                <div>
+                  <div class="font-medium text-white">${c.name}</div>
+                  <div class="text-slate-500">${c.ticker} · ${c.market}</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-2.5 text-right text-slate-300">
+              ${c.current_price != null ? Number(c.current_price).toFixed(2) : '--'}
+              <span class="text-slate-500"> ${c.currency}</span>
+            </td>
+            <td class="py-2.5 text-right text-slate-300">${c.per != null ? Number(c.per).toFixed(1)+'倍' : '--'}</td>
+            <td class="py-2.5 text-right text-slate-300">${c.pbr != null ? Number(c.pbr).toFixed(2)+'倍' : '--'}</td>
+            <td class="py-2.5 text-right">
+              <div class="flex items-center justify-end gap-2">
+                <div class="nc-bar w-12"><div class="nc-fill" style="width:${ncBarPct}%"></div></div>
+                <span class="${ncColor} font-bold">${ncRatio != null ? Number(ncRatio).toFixed(2) : '--'}</span>
+              </div>
+            </td>
+            <td class="py-2.5 text-center">
+              ${c.minervini_pass ? '<span class="text-green-400 font-bold">✅</span>' : '<span class="text-slate-600">—</span>'}
+            </td>
+            <td class="py-2.5 text-center">
+              ${c.canslim_pass ? '<span class="text-orange-400 font-bold">↑急増</span>' : '<span class="text-slate-600">—</span>'}
+            </td>
+            <td class="py-2.5 text-right ${rsiColor}">${c.rsi14 != null ? Number(c.rsi14).toFixed(0) : '--'}</td>
+            <td class="py-2.5 text-right">
+              <span class="font-bold text-base ${scoreColor}">${Number(c.composite_score).toFixed(1)}</span>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div class="mt-2 text-xs text-slate-500">
+      ★ NC比率 1.0以上 = 「現金 > 時価総額」の超安全状態（清原式の黄金指標）。スコア高い順に自動購入
+    </div>`;
 }
 
 // ==================== ポートフォリオ ====================
@@ -235,37 +380,52 @@ async function loadPortfolio() {
       return;
     }
     el.innerHTML = `
-      <table class="w-full text-sm">
-        <thead><tr class="text-slate-400 text-xs border-b border-slate-700">
+      <table class="w-full text-xs">
+        <thead><tr class="text-slate-400 border-b border-slate-700">
           <th class="pb-2 text-left">銘柄</th>
           <th class="pb-2 text-right">株数</th>
           <th class="pb-2 text-right">現在値</th>
-          <th class="pb-2 text-right">評価額(円)</th>
           <th class="pb-2 text-right">含み損益</th>
+          <th class="pb-2 text-right" title="最高値の92%でストップ">🛡 ストップ</th>
+          <th class="pb-2 text-right">目標(×2)</th>
         </tr></thead>
         <tbody>
-          ${d.holdings.map(h => `
+          ${d.holdings.map(h => {
+            const stopColor = h.trailing_stop_local / h.current_price_local > 0.97
+              ? 'text-yellow-400' : 'text-red-400';
+            const partialBadge = h.partial_taken
+              ? '<span class="text-xs text-orange-400 ml-1">半分売済</span>' : '';
+            return `
             <tr class="border-b border-slate-800 hover:bg-slate-800/40">
               <td class="py-2.5">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-base">${h.flag}</span>
+                  <span class="text-sm">${h.flag}</span>
                   <div>
-                    <div class="font-medium text-white text-xs">${h.name}</div>
-                    <div class="text-slate-500 text-xs">${h.ticker} · ${h.currency}</div>
+                    <div class="font-medium text-white">${h.name}${partialBadge}</div>
+                    <div class="text-slate-500">${h.ticker} · ${h.currency}</div>
+                    ${h.buy_nc_ratio != null ? `<div class="text-cyan-600">NC比率${Number(h.buy_nc_ratio).toFixed(2)}</div>` : ''}
                   </div>
                 </div>
               </td>
-              <td class="py-2.5 text-right text-slate-300 text-xs">${h.shares}</td>
-              <td class="py-2.5 text-right text-slate-300 text-xs">
-                ${h.current_price_local.toFixed(2)}<span class="text-slate-500"> ${h.currency}</span>
+              <td class="py-2.5 text-right text-slate-300">${h.shares}</td>
+              <td class="py-2.5 text-right text-slate-300">
+                ${Number(h.current_price_local).toFixed(4)}<br>
+                <span class="text-slate-500">${fmtJpy(h.current_price_jpy)}</span>
               </td>
-              <td class="py-2.5 text-right text-white font-medium text-xs">${fmtJpy(h.market_value_jpy)}</td>
-              <td class="py-2.5 text-right text-xs font-medium ${h.unrealized_pct >= 0 ? 'positive' : 'negative'}">
-                ${h.unrealized_pct >= 0 ? '+' : ''}${fmtJpy(h.unrealized_pnl_jpy)}<br>
-                <span class="text-xs">(${fmtPct(h.unrealized_pct)})</span>
+              <td class="py-2.5 text-right font-medium ${h.unrealized_pct >= 0 ? 'positive' : 'negative'}">
+                ${h.unrealized_pct >= 0 ? '+' : ''}${Number(h.unrealized_pct).toFixed(2)}%<br>
+                <span class="text-xs">${fmtJpy(h.unrealized_pnl_jpy)}</span>
               </td>
-            </tr>
-          `).join('')}
+              <td class="py-2.5 text-right">
+                <span class="${stopColor} font-bold">${Number(h.trailing_stop_local).toFixed(4)}</span><br>
+                <span class="text-slate-500">${Number(h.stop_pct_from_peak).toFixed(1)}%</span>
+              </td>
+              <td class="py-2.5 text-right text-slate-400">
+                ${Number(h.target_price_local).toFixed(4)}<br>
+                <span class="text-xs">${h.unrealized_pct != null ? `+${(100 - h.unrealized_pct < 0 ? 0 : 100).toFixed(0)}%` : '--'}</span>
+              </td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>`;
   } catch(e) { console.error(e); }
@@ -282,37 +442,39 @@ async function loadTrades() {
     }
     el.innerHTML = `
       <table class="w-full text-xs">
-        <thead><tr class="text-slate-400 text-xs border-b border-slate-700">
-          <th class="pb-2 text-left">日時(JST)</th>
+        <thead><tr class="text-slate-400 border-b border-slate-700">
+          <th class="pb-2 text-left">日時</th>
           <th class="pb-2 text-left">銘柄</th>
-          <th class="pb-2 text-center">売買</th>
+          <th class="pb-2 text-center">種別</th>
           <th class="pb-2 text-right">株数</th>
-          <th class="pb-2 text-right">現地価格</th>
+          <th class="pb-2 text-right">価格</th>
           <th class="pb-2 text-right">円換算</th>
-          <th class="pb-2 text-right">為替</th>
-          <th class="pb-2 text-left">判断理由</th>
+          <th class="pb-2 text-left">理由</th>
         </tr></thead>
         <tbody>
-          ${d.trades.map(t => `
+          ${d.trades.map(t => {
+            const actionKey = ['buy','sell','損切り','利確','部分利確'].includes(t.action) ? t.action : 'sell';
+            const actionLabel = t.action === 'buy' ? '買い' :
+              t.action === '損切り' ? '損切り' :
+              t.action === '利確' ? '利確' :
+              t.action === '部分利確' ? '部分利確' : '売り';
+            return `
             <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-              <td class="py-2 text-slate-500 whitespace-nowrap">${t.executed_at?.slice(0,16).replace('T',' ') || '--'}</td>
+              <td class="py-2 text-slate-500 whitespace-nowrap">${t.executed_at?.slice(0,16).replace('T',' ')||'--'}</td>
               <td class="py-2">
                 <span class="mr-1">${t.flag}</span>
                 <span class="text-white font-medium">${t.name}</span>
                 <span class="text-slate-500 ml-1">${t.ticker}</span>
               </td>
               <td class="py-2 text-center">
-                <span class="badge-${t.action} text-xs px-2 py-0.5 rounded-full">
-                  ${t.action === 'buy' ? '買い' : '売り'}
-                </span>
+                <span class="badge-${actionKey} text-xs px-2 py-0.5 rounded-full">${actionLabel}</span>
               </td>
               <td class="py-2 text-right text-slate-300">${t.shares}</td>
-              <td class="py-2 text-right text-slate-300">${Number(t.price_local).toFixed(2)} ${t.currency}</td>
+              <td class="py-2 text-right text-slate-300">${Number(t.price_local).toFixed(4)} ${t.currency}</td>
               <td class="py-2 text-right text-white font-medium">${fmtJpy(t.total_jpy)}</td>
-              <td class="py-2 text-right text-slate-500">${Number(t.fx_rate).toFixed(1)}</td>
               <td class="py-2 text-slate-400 max-w-xs truncate" title="${t.reason||''}">${t.reason||'—'}</td>
-            </tr>
-          `).join('')}
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>`;
   } catch(e) { console.error(e); }
@@ -332,14 +494,12 @@ async function loadChart(ticker) {
     document.getElementById('chart-info').classList.remove('hidden');
 
     document.getElementById('info-currency').textContent = `${d.flag} ${d.currency}`;
-    document.getElementById('info-price').textContent =
-      `${d.current_price.toFixed(4)} ${d.currency}`;
-    document.getElementById('info-ma5').textContent =
-      d.ma5 ? `${d.ma5.toFixed(2)}` : '--';
+    document.getElementById('info-price').textContent = `${Number(d.current_price).toFixed(4)} ${d.currency}`;
+    document.getElementById('info-ma5').textContent = d.ma5 ? Number(d.ma5).toFixed(2) : '--';
+    document.getElementById('info-ma50').textContent = d.ma50 ? Number(d.ma50).toFixed(2) : '--';
     const rsiEl = document.getElementById('info-rsi');
-    rsiEl.textContent = d.rsi14 ? d.rsi14.toFixed(1) : '--';
-    rsiEl.className = `font-medium ${d.rsi14 >= 70 ? 'text-red-400' :
-                                      d.rsi14 <= 30 ? 'text-green-400' : 'text-yellow-400'}`;
+    rsiEl.textContent = d.rsi14 ? Number(d.rsi14).toFixed(1) : '--';
+    rsiEl.className = `font-medium ${d.rsi14 >= 70 ? 'text-red-400' : d.rsi14 <= 30 ? 'text-green-400' : 'text-yellow-400'}`;
 
     if (priceChart) priceChart.destroy();
     const ctx = document.getElementById('price-chart').getContext('2d');
@@ -355,6 +515,8 @@ async function loadChart(ticker) {
             borderColor:'#60a5fa', pointRadius:0, borderWidth:1.5, tension:0.3 },
           { label: 'MA25', data: d.price_history.map(h => h.ma25),
             borderColor:'#fbbf24', pointRadius:0, borderWidth:1.5, tension:0.3 },
+          { label: 'MA50', data: d.price_history.map(h => h.ma50),
+            borderColor:'#a78bfa', pointRadius:0, borderWidth:1.5, tension:0.3, borderDash:[4,2] },
         ],
       },
       options: {
@@ -380,7 +542,7 @@ async function loadChart(ticker) {
 // ==================== 資産推移 ====================
 async function loadAssetChart() {
   try {
-    const d = await fetch('/api/asset-history?days=30').then(r => r.json());
+    const d = await fetch('/api/asset-history?days=60').then(r => r.json());
     const h = d.history || [];
     if (assetChart) assetChart.destroy();
     const ctx = document.getElementById('asset-chart').getContext('2d');
@@ -392,6 +554,8 @@ async function loadAssetChart() {
           { label: '総資産', data: h.map(x => x.total_assets),
             borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.1)',
             fill:true, pointRadius:2, borderWidth:2, tension:0.4 },
+          { label: '現金', data: h.map(x => x.cash),
+            borderColor:'#22c55e', pointRadius:0, borderWidth:1.5, tension:0.4 },
           { label: '初期資金', data: h.map(() => 2000000),
             borderColor:'#ef4444', borderDash:[6,3], pointRadius:0, borderWidth:1.5 },
         ],
@@ -407,7 +571,7 @@ async function loadAssetChart() {
           }
         },
         scales: {
-          x:{ ticks:{color:'#64748b', maxTicksLimit:8}, grid:{display:false} },
+          x:{ ticks:{color:'#64748b', maxTicksLimit:10}, grid:{display:false} },
           y:{ ticks:{color:'#64748b', callback: v => fmtJpy(v)}, grid:{color:'#1e3a5f'} },
         },
       },
@@ -439,11 +603,13 @@ async function loadWatchlistTabs() {
 async function runTrade() {
   const btn = document.getElementById('run-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span> 全市場を分析中...';
+  btn.innerHTML = '<span class="spin"></span> 分析中...';
   try {
     const d = await fetch('/api/trade/run', {method:'POST'}).then(r => r.json());
     if (d.status === 'success') {
-      showToast(`✅ 取引完了！${d.executed_trades?.length||0}件実行`, 'success');
+      const sold = d.sold_tickers?.length || 0;
+      const bought = d.bought_tickers?.length || 0;
+      showToast(`✅ 取引完了！売${sold}件 / 買${bought}件`, 'success');
     } else {
       showToast(`⚠️ ${d.message || 'エラー'}`, 'error');
     }
@@ -452,7 +618,7 @@ async function runTrade() {
     showToast('❌ サーバーエラー', 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '⚡ 今すぐ取引';
+    btn.innerHTML = '⚡ 取引実行';
   }
 }
 
@@ -461,6 +627,7 @@ async function resetData() {
   await fetch('/api/reset', {method:'POST'});
   showToast('🔄 リセット完了！', 'info');
   await loadAll();
+  await loadScreening();
 }
 
 // ==================== 全データ更新 ====================
@@ -471,6 +638,7 @@ async function loadAll() {
     loadPortfolio(),
     loadTrades(),
     loadAssetChart(),
+    loadScreening(),
   ]);
   if (selectedTicker) loadChart(selectedTicker);
 }

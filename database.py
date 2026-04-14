@@ -16,6 +16,14 @@ def get_conn():
     return conn
 
 
+def _add_column_if_not_exists(cur, table: str, column: str, definition: str):
+    """既存テーブルに列が存在しなければ追加する"""
+    cur.execute(f"PRAGMA table_info({table})")
+    cols = [row[1] for row in cur.fetchall()]
+    if column not in cols:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_db():
     conn = get_conn()
     cur  = conn.cursor()
@@ -38,11 +46,19 @@ def init_db():
             currency TEXT NOT NULL,
             flag TEXT NOT NULL,
             shares REAL NOT NULL,
-            avg_cost_local REAL NOT NULL,   -- 現地通貨建ての取得単価
-            avg_cost_jpy REAL NOT NULL,     -- 円建ての取得単価（為替レート込み）
+            avg_cost_local REAL NOT NULL,
+            avg_cost_jpy REAL NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # トレーリングストップ・部分利確・購入時指標の列を追加
+    _add_column_if_not_exists(cur, "portfolio", "peak_price",    "REAL")
+    _add_column_if_not_exists(cur, "portfolio", "trailing_stop", "REAL")
+    _add_column_if_not_exists(cur, "portfolio", "partial_taken", "INTEGER DEFAULT 0")
+    _add_column_if_not_exists(cur, "portfolio", "buy_per",       "REAL")
+    _add_column_if_not_exists(cur, "portfolio", "buy_pbr",       "REAL")
+    _add_column_if_not_exists(cur, "portfolio", "buy_nc_ratio",  "REAL")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS trades (
@@ -54,11 +70,11 @@ def init_db():
             flag TEXT NOT NULL,
             action TEXT NOT NULL,
             shares REAL NOT NULL,
-            price_local REAL NOT NULL,      -- 現地通貨の取引単価
-            price_jpy REAL NOT NULL,        -- 円換算の取引単価
-            total_jpy REAL NOT NULL,        -- 円換算の取引総額
-            commission_jpy REAL NOT NULL,   -- 円換算の手数料
-            fx_rate REAL NOT NULL,          -- 使用した為替レート
+            price_local REAL NOT NULL,
+            price_jpy REAL NOT NULL,
+            total_jpy REAL NOT NULL,
+            commission_jpy REAL NOT NULL,
+            fx_rate REAL NOT NULL,
             reason TEXT,
             executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -74,6 +90,51 @@ def init_db():
         )
     """)
 
+    # ファンダメンタル指標キャッシュ（1日1回取得）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS fundamental_cache (
+            ticker TEXT PRIMARY KEY,
+            name TEXT,
+            market_cap REAL,
+            market_cap_usd REAL,
+            per REAL,
+            pbr REAL,
+            current_assets REAL,
+            total_debt REAL,
+            cash_and_equiv REAL,
+            net_cash REAL,
+            net_cash_ratio REAL,
+            dividend_yield REAL,
+            sector TEXT,
+            currency TEXT,
+            last_updated DATE
+        )
+    """)
+
+    # スクリーニング通過銘柄（スコア降順で保存）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS screened_stocks (
+            ticker TEXT PRIMARY KEY,
+            name TEXT,
+            market TEXT,
+            currency TEXT,
+            flag TEXT,
+            market_cap REAL,
+            per REAL,
+            pbr REAL,
+            net_cash_ratio REAL,
+            composite_score REAL,
+            minervini_pass INTEGER DEFAULT 0,
+            canslim_pass INTEGER DEFAULT 0,
+            current_price REAL,
+            rsi14 REAL,
+            ma50 REAL,
+            ma150 REAL,
+            ma200 REAL,
+            screened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     cur.execute("SELECT id FROM account WHERE id = 1")
     if not cur.fetchone():
         cur.execute(
@@ -86,6 +147,8 @@ def init_db():
     conn.close()
     print("✅ データベースの初期化が完了しました")
 
+
+# ==================== account ====================
 
 def get_account() -> Dict:
     conn = get_conn()
@@ -104,6 +167,8 @@ def update_cash(new_cash: float):
     conn.close()
 
 
+# ==================== portfolio ====================
+
 def get_portfolio() -> List[Dict]:
     conn = get_conn()
     rows = conn.execute("SELECT * FROM portfolio ORDER BY market, ticker").fetchall()
@@ -119,20 +184,59 @@ def get_holding(ticker: str) -> Optional[Dict]:
 
 
 def upsert_holding(ticker: str, name: str, market: str, currency: str, flag: str,
-                   shares: float, avg_cost_local: float, avg_cost_jpy: float):
+                   shares: float, avg_cost_local: float, avg_cost_jpy: float,
+                   peak_price: Optional[float] = None,
+                   trailing_stop: Optional[float] = None,
+                   partial_taken: int = 0,
+                   buy_per: Optional[float] = None,
+                   buy_pbr: Optional[float] = None,
+                   buy_nc_ratio: Optional[float] = None):
     conn = get_conn()
     conn.execute("""
         INSERT INTO portfolio
-            (ticker, name, market, currency, flag, shares, avg_cost_local, avg_cost_jpy)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (ticker, name, market, currency, flag, shares, avg_cost_local, avg_cost_jpy,
+             peak_price, trailing_stop, partial_taken, buy_per, buy_pbr, buy_nc_ratio)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(ticker) DO UPDATE SET
             shares = ?,
             avg_cost_local = ?,
             avg_cost_jpy = ?,
             name = ?,
-            flag = ?
-    """, (ticker, name, market, currency, flag, shares, avg_cost_local, avg_cost_jpy,
-          shares, avg_cost_local, avg_cost_jpy, name, flag))
+            flag = ?,
+            peak_price    = COALESCE(?, peak_price),
+            trailing_stop = COALESCE(?, trailing_stop),
+            partial_taken = ?,
+            buy_per       = COALESCE(?, buy_per),
+            buy_pbr       = COALESCE(?, buy_pbr),
+            buy_nc_ratio  = COALESCE(?, buy_nc_ratio)
+    """, (
+        ticker, name, market, currency, flag, shares, avg_cost_local, avg_cost_jpy,
+        peak_price, trailing_stop, partial_taken, buy_per, buy_pbr, buy_nc_ratio,
+        # UPDATE部分
+        shares, avg_cost_local, avg_cost_jpy, name, flag,
+        peak_price, trailing_stop, partial_taken,
+        buy_per, buy_pbr, buy_nc_ratio,
+    ))
+    conn.commit()
+    conn.close()
+
+
+def update_trailing_stop(ticker: str, peak_price: float, trailing_stop: float):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE portfolio SET peak_price = ?, trailing_stop = ? WHERE ticker = ?",
+        (peak_price, trailing_stop, ticker)
+    )
+    conn.commit()
+    conn.close()
+
+
+def mark_partial_taken(ticker: str):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE portfolio SET partial_taken = 1 WHERE ticker = ?",
+        (ticker,)
+    )
     conn.commit()
     conn.close()
 
@@ -143,6 +247,8 @@ def delete_holding(ticker: str):
     conn.commit()
     conn.close()
 
+
+# ==================== trades ====================
 
 def save_trade(ticker: str, name: str, market: str, currency: str, flag: str,
                action: str, shares: float, price_local: float, price_jpy: float,
@@ -167,6 +273,21 @@ def get_trades(limit: int = 50) -> List[Dict]:
     conn.close()
     return [dict(r) for r in rows]
 
+
+def recently_sold(ticker: str, days: int = 3) -> bool:
+    """直近N日以内に売却したか確認（売買コスト節約）"""
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT id FROM trades
+        WHERE ticker = ? AND action IN ('sell', '損切り', '利確', '部分利確')
+        AND executed_at >= datetime('now', ?)
+        ORDER BY executed_at DESC LIMIT 1
+    """, (ticker, f"-{days} days")).fetchone()
+    conn.close()
+    return row is not None
+
+
+# ==================== asset_history ====================
 
 def save_asset_snapshot(total: float, cash: float, stock_value: float):
     conn = get_conn()
@@ -194,11 +315,102 @@ def get_asset_history(days: int = 30) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+# ==================== fundamental_cache ====================
+
+def get_fundamental_cache(ticker: str) -> Optional[Dict]:
+    """本日付のキャッシュがあれば返す、なければ None"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM fundamental_cache WHERE ticker = ? AND last_updated = ?",
+        (ticker, date.today().isoformat())
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def save_fundamental_cache(data: Dict):
+    conn = get_conn()
+    conn.execute("""
+        INSERT INTO fundamental_cache
+            (ticker, name, market_cap, market_cap_usd, per, pbr,
+             current_assets, total_debt, cash_and_equiv, net_cash,
+             net_cash_ratio, dividend_yield, sector, currency, last_updated)
+        VALUES (:ticker, :name, :market_cap, :market_cap_usd, :per, :pbr,
+                :current_assets, :total_debt, :cash_and_equiv, :net_cash,
+                :net_cash_ratio, :dividend_yield, :sector, :currency, :last_updated)
+        ON CONFLICT(ticker) DO UPDATE SET
+            name=excluded.name, market_cap=excluded.market_cap,
+            market_cap_usd=excluded.market_cap_usd, per=excluded.per,
+            pbr=excluded.pbr, current_assets=excluded.current_assets,
+            total_debt=excluded.total_debt, cash_and_equiv=excluded.cash_and_equiv,
+            net_cash=excluded.net_cash, net_cash_ratio=excluded.net_cash_ratio,
+            dividend_yield=excluded.dividend_yield, sector=excluded.sector,
+            currency=excluded.currency, last_updated=excluded.last_updated
+    """, data)
+    conn.commit()
+    conn.close()
+
+
+# ==================== screened_stocks ====================
+
+def clear_screened_stocks():
+    conn = get_conn()
+    conn.execute("DELETE FROM screened_stocks")
+    conn.commit()
+    conn.close()
+
+
+def save_screened_stock(data: Dict):
+    conn = get_conn()
+    conn.execute("""
+        INSERT INTO screened_stocks
+            (ticker, name, market, currency, flag, market_cap, per, pbr,
+             net_cash_ratio, composite_score, minervini_pass, canslim_pass,
+             current_price, rsi14, ma50, ma150, ma200)
+        VALUES (:ticker, :name, :market, :currency, :flag, :market_cap, :per, :pbr,
+                :net_cash_ratio, :composite_score, :minervini_pass, :canslim_pass,
+                :current_price, :rsi14, :ma50, :ma150, :ma200)
+        ON CONFLICT(ticker) DO UPDATE SET
+            composite_score=excluded.composite_score,
+            minervini_pass=excluded.minervini_pass,
+            canslim_pass=excluded.canslim_pass,
+            current_price=excluded.current_price,
+            rsi14=excluded.rsi14, ma50=excluded.ma50,
+            ma150=excluded.ma150, ma200=excluded.ma200,
+            per=excluded.per, pbr=excluded.pbr,
+            net_cash_ratio=excluded.net_cash_ratio,
+            screened_at=CURRENT_TIMESTAMP
+    """, data)
+    conn.commit()
+    conn.close()
+
+
+def get_screened_stocks() -> List[Dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM screened_stocks ORDER BY composite_score DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def is_screened(ticker: str) -> bool:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT ticker FROM screened_stocks WHERE ticker = ?", (ticker,)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+# ==================== reset ====================
+
 def reset_all():
     conn = get_conn()
     conn.execute("DELETE FROM portfolio")
     conn.execute("DELETE FROM trades")
     conn.execute("DELETE FROM asset_history")
+    conn.execute("DELETE FROM screened_stocks")
     conn.execute(
         "UPDATE account SET cash = ?, updated_at = ? WHERE id = 1",
         (INITIAL_CAPITAL, datetime.now().isoformat())
