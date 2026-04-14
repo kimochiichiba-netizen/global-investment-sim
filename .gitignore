@@ -1,0 +1,22 @@
+# データベース（実行データは共有しない）
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# 環境変数（秘密情報を含むため）
+.env
+
+# macOS
+.DS_Store
+
+# ログ
+*.log
