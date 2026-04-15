@@ -386,11 +386,13 @@ def get_asset_history(days: int = 30) -> List[Dict]:
 # ==================== fundamental_cache ====================
 
 def get_fundamental_cache(ticker: str) -> Optional[Dict]:
-    """本日付のキャッシュがあれば返す、なければ None"""
+    """7日以内のキャッシュがあれば返す（毎日取得せず負荷を下げる）"""
+    from datetime import timedelta
+    cutoff = (date.today() - timedelta(days=7)).isoformat()
     conn = get_conn()
     row = conn.execute(
-        "SELECT * FROM fundamental_cache WHERE ticker = ? AND last_updated = ?",
-        (ticker, date.today().isoformat())
+        "SELECT * FROM fundamental_cache WHERE ticker = ? AND last_updated >= ?",
+        (ticker, cutoff)
     ).fetchone()
     conn.close()
     return dict(row) if row else None

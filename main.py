@@ -73,7 +73,7 @@ def scheduled_screening():
 
 scheduler.add_job(
     scheduled_trade,
-    IntervalTrigger(minutes=1, timezone=JST),
+    IntervalTrigger(minutes=5, timezone=JST),
     id="auto_trade",
     replace_existing=True,
 )
